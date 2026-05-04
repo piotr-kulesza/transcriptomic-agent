@@ -25,6 +25,22 @@ const VERDICT_STYLE = {
   pending:   { color: "#94a3b8", icon: "○", label: "Pending"    },
 };
 
+function renderThought(text, t) {
+  const parts = text.split(/(```[\s\S]*?```)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("```")) {
+      const body = part.slice(3, -3).replace(/^\w+\n/, "");
+      return (
+        <pre key={i} style={{ margin: "8px 0", padding: "10px 12px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 12, color: t.codeText, overflowX: "auto", lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "pre-wrap" }}>
+          {body}
+        </pre>
+      );
+    }
+    if (!part) return null;
+    return <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part}</span>;
+  });
+}
+
 export default function LogEntry({ entry, theme: t }) {
   const [expanded, setExpanded] = useState(false);
   const ac = ACTION_COLORS[entry.action] || "#94a3b8";
@@ -50,7 +66,7 @@ export default function LogEntry({ entry, theme: t }) {
 
           {entry.type === "thought" && (
             <div style={{ fontSize: 14, color: t.textPrimary, lineHeight: 1.75, paddingLeft: 16, borderLeft: `2px solid ${t.border}` }}>
-              {entry.text}
+              {renderThought(entry.text, t)}
             </div>
           )}
 
