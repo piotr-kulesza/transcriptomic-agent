@@ -25,6 +25,59 @@ const VERDICT_STYLE = {
   pending:   { color: "#94a3b8", icon: "○", label: "Pending"    },
 };
 
+function renderInline(text, t) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i} style={{ color: t.textPrimary, fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+function renderSummary(text, t) {
+  const lines = text.split("\n");
+  const elements = [];
+  let listItems = [];
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      elements.push(
+        <ul key={`ul-${elements.length}`} style={{ margin: "4px 0 12px 0", paddingLeft: 20 }}>
+          {listItems}
+        </ul>
+      );
+      listItems = [];
+    }
+  };
+
+  lines.forEach((line, i) => {
+    if (line.startsWith("## ")) {
+      flushList();
+      elements.push(
+        <div key={i} style={{ fontSize: 11, fontWeight: 700, color: "#4ade80", letterSpacing: 1.2, textTransform: "uppercase", marginTop: elements.length === 0 ? 0 : 14, marginBottom: 6 }}>
+          {line.slice(3)}
+        </div>
+      );
+    } else if (line.startsWith("- ") || line.startsWith("* ")) {
+      listItems.push(
+        <li key={i} style={{ fontSize: 13, color: t.textSecondary, lineHeight: 1.65, marginBottom: 3 }}>
+          {renderInline(line.slice(2), t)}
+        </li>
+      );
+    } else if (line.trim()) {
+      flushList();
+      elements.push(
+        <div key={i} style={{ fontSize: 13, color: t.textSecondary, lineHeight: 1.75, marginBottom: 4 }}>
+          {renderInline(line, t)}
+        </div>
+      );
+    }
+  });
+  flushList();
+  return elements;
+}
+
 function renderThought(text, t) {
   const parts = text.split(/(```[\s\S]*?```)/g);
   return parts.map((part, i) => {
@@ -149,8 +202,11 @@ export default function LogEntry({ entry, theme: t }) {
           )}
 
           {entry.type === "done" && !entry.exhausted && (
-            <div style={{ fontSize: 14, color: "#4ade80", fontWeight: 600, padding: "8px 14px", background: "#4ade8010", border: "1px solid #4ade8025", borderRadius: 6 }}>
-              {entry.text}
+            <div style={{ padding: "14px 16px", background: "#4ade8008", border: "1px solid #4ade8025", borderLeft: "3px solid #4ade80", borderRadius: 6 }}>
+              <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>
+                Analysis Complete
+              </div>
+              {renderSummary(entry.text, t)}
             </div>
           )}
 
