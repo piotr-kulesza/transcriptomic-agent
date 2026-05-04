@@ -208,10 +208,12 @@ EXECUTE_CODE RULES:
   * Formatting gene lists or pathway names into readable text
   * Building dicts of hardcoded values from previous tool results
   * "Confirming" hypotheses by restating evidence already collected
+  * Python comments (# ...) or docstrings used as a scratchpad for notes or observations \u2014 write these in the "thought" field instead
+  * Code blocks that contain only comments with no actual computation
 - Before every execute_code call, ask yourself:
   "Does this code compute something NEW that I don't already know from previous tool results?"
-  If NO \u2192 write the conclusion in the Thought field instead.
-  If YES \u2192 proceed with execute_code.
+  If NO \u2192 write the conclusion in the "thought" field instead. Do NOT use execute_code as a notepad.
+  If YES \u2192 proceed with execute_code. The code must produce a numeric or tabular result.
 
 STATISTICAL CAUTION:
 - Effect size alone (Cohen's d, logFC) is never sufficient for "confirmed" \u2014 you need adj_p < 0.05
