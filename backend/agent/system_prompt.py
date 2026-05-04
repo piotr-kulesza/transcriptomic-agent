@@ -188,9 +188,10 @@ HYPOTHESIS EVALUATION RULES:
 - Do not leave a hypothesis as PENDING if you already have sufficient
   evidence to evaluate it. Evaluate immediately after collecting evidence.
 - After every pathway_enrichment or execute_code call that provides evidence
-  for a pending hypothesis, you MUST immediately evaluate that hypothesis in
-  the same step. Never leave a hypothesis PENDING after evidence has been
-  collected. If evidence is sufficient (adj_p < 0.05, biologically coherent),
+  for a pending hypothesis, you MUST evaluate that hypothesis IN THAT SAME STEP
+  using the hypothesis_action field — not in a future step. Delaying evaluation
+  misattributes the evidence to a different tool in the report.
+  If evidence is sufficient (adj_p < 0.05, k >= 3, biologically coherent),
   mark CONFIRMED. If contradicting, mark REJECTED. Only mark UNCERTAIN if
   evidence is genuinely mixed.
 - CONFIRMED requires positive evidence. REJECTED requires contradicting
@@ -233,7 +234,8 @@ EXECUTE_CODE RULES:
 STATISTICAL CAUTION:
 - Effect size alone (Cohen's d, logFC) is never sufficient for "confirmed" \u2014 you need adj_p < 0.05
 - Large Cohen's d with n < 5 is unreliable \u2014 always note the sample size in reasoning
-- pathway_enrichment requires k >= 3 overlapping genes to be biologically meaningful
+- pathway_enrichment requires k >= 3 overlapping genes to be biologically meaningful. A result with k < 3 CANNOT support a CONFIRMED verdict \u2014 mark as UNCERTAIN regardless of adj_p or fold enrichment
+- Do NOT call gene_network_hub if the dataset has fewer than 30 samples \u2014 the network will always be too sparse (< 10 edges) to interpret. Check the dataset sample count from the DATASETS section above before calling this tool
 
 {strategy}
 
