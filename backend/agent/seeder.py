@@ -12,10 +12,10 @@ import pandas as pd
 from scipy.stats import mannwhitneyu as mwu
 from statsmodels.stats.multitest import multipletests
 
-from ..tools.cross import cross_dataset_de
+from ..tools.cross import cross_dataset_de, resolve_group
 
 
-def generate_seeds(datasets: list) -> tuple[list[dict], str, dict]:
+def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], str, dict]:
     """
     Run genome-wide MWU + BH pre-analysis per dataset/group-pair and return
     (seed_hypotheses, seed_summary_text, seed_data).
@@ -141,20 +141,22 @@ def generate_seeds(datasets: list) -> tuple[list[dict], str, dict]:
 
         # ── 2. Cross-dataset DE if >= 2 datasets ─────────────────────────────
         if len(datasets) >= 2:
+            _mappings = mappings or {}
             all_groups: set[str] = set()
             for ds in datasets:
-                all_groups.update(ds["meta"][ds["group_col"]].dropna().unique())
+                for raw_g in ds["meta"][ds["group_col"]].dropna().unique():
+                    all_groups.add(resolve_group(raw_g, _mappings))
 
             for group_a, group_b in itertools.combinations(all_groups, 2):
                 n_with_pair = sum(
                     1 for ds in datasets
-                    if group_a in ds["meta"][ds["group_col"]].values
-                    and group_b in ds["meta"][ds["group_col"]].values
+                    if group_a in {resolve_group(g, _mappings) for g in ds["meta"][ds["group_col"]].values}
+                    and group_b in {resolve_group(g, _mappings) for g in ds["meta"][ds["group_col"]].values}
                 )
                 if n_with_pair < 2:
                     continue
                 try:
-                    result = cross_dataset_de(datasets, groupA=group_a, groupB=group_b, topN=10)
+                    result = cross_dataset_de(datasets, groupA=group_a, groupB=group_b, topN=10, mappings=_mappings)
                     if "error" in result:
                         continue
                     top_up_cross   = [g["gene"] for g in result.get("top_consistent_up", [])[:3]]

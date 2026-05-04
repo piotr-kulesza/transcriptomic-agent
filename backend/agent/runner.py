@@ -210,7 +210,7 @@ async def run_agent_loop(
 
     # ── Pre-analysis seeding ──────────────────────────────────────────────────
     loop = asyncio.get_event_loop()
-    seeds, seed_summary, seed_data = await loop.run_in_executor(None, generate_seeds, datasets)
+    seeds, seed_summary, seed_data = await loop.run_in_executor(None, lambda: generate_seeds(datasets, mappings=mappings))
     system_prompt = build_system_prompt(datasets, len(common_genes), seed_summary=seed_summary, deg_datasets=deg_datasets)
     if mappings:
         mapping_text = "\n".join(
