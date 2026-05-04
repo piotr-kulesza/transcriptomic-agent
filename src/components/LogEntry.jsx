@@ -32,7 +32,7 @@ export default function LogEntry({ entry }) {
   const isStep = entry.type === "thinking";
 
   return (
-    <div className="ent" style={{ marginBottom: isStep ? 20 : 10, marginTop: isStep ? 16 : 0, paddingLeft: isStep ? 0 : 14, borderLeft: isStep ? "none" : "2px solid #21262d" }}>
+    <div className="ent" style={{ marginBottom: isStep ? 20 : 10, marginTop: isStep ? 16 : 0, paddingLeft: isStep ? 0 : 14, borderLeft: isStep ? "none" : "2px solid #252863" }}>
       <div
         style={{ display: "flex", alignItems: "flex-start", gap: 9, cursor: entry.type === "result" ? "pointer" : "default" }}
         onClick={() => entry.type === "result" && setExpanded(e => !e)}
@@ -41,22 +41,22 @@ export default function LogEntry({ entry }) {
 
           {entry.type === "thinking" && (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
+              <div style={{ flex: 1, height: 1, background: "#252863" }} />
               <span style={{ fontSize: 11, color: "#6C5CE7", letterSpacing: 0.8, whiteSpace: "nowrap", fontWeight: 600, opacity: 0.8 }}>
                 {entry.text.replace("Agent thinking... ", "").toUpperCase()}
               </span>
-              <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
+              <div style={{ flex: 1, height: 1, background: "#252863" }} />
             </div>
           )}
 
           {entry.type === "thought" && (
-            <div style={{ fontSize: 14, color: "#c9d1d9", lineHeight: 1.7 }}>{entry.text}</div>
+            <div style={{ fontSize: 14, color: "#E6E8F0", lineHeight: 1.7 }}>{entry.text}</div>
           )}
 
           {entry.type === "code" && (
             <div>
               <div style={{ fontSize: 12, color: "#a78bfa", marginBottom: 5, fontWeight: 500 }}>Custom code</div>
-              <pre style={{ padding: 10, background: "#161b22", border: "1px solid #2a1f4a", fontSize: 12, color: "#c4b5fd", overflowX: "auto", maxHeight: 160, lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
+              <pre style={{ padding: 10, background: "#16182D", border: "1px solid #252863", fontSize: 12, color: "#c4b5fd", overflowX: "auto", maxHeight: 160, lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
                 {entry.code}
               </pre>
             </div>
@@ -71,11 +71,11 @@ export default function LogEntry({ entry }) {
                 >
                   {entry.action}
                 </span>
-                <span style={{ fontSize: 13, color: "#8b949e", flex: 1 }}>{entry.summary}</span>
-                <span style={{ fontSize: 12, color: "#334155" }}>{expanded ? "▲" : "▼"}</span>
+                <span style={{ fontSize: 13, color: "#B4B7D1", flex: 1 }}>{entry.summary}</span>
+                <span style={{ fontSize: 12, color: "#7A7FA6" }}>{expanded ? "▲" : "▼"}</span>
               </div>
               {expanded && (
-                <pre style={{ marginTop: 8, padding: 10, background: "#0d1117", border: "1px solid #21262d", fontSize: 12, color: "#64748b", overflowX: "auto", maxHeight: 300, overflowY: "auto", lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
+                <pre style={{ marginTop: 8, padding: 10, background: "#0E1020", border: "1px solid #252863", fontSize: 12, color: "#7A7FA6", overflowX: "auto", maxHeight: 300, overflowY: "auto", lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
                   {JSON.stringify(entry.result, null, 2).slice(0, 4000)}
                 </pre>
               )}
@@ -83,21 +83,21 @@ export default function LogEntry({ entry }) {
           )}
 
           {entry.type === "hypothesis_propose" && (
-            <div style={{ padding: "9px 12px", background: "#161b22", border: "1px solid #1e3a5f", borderRadius: 6 }}>
+            <div style={{ padding: "9px 12px", background: "#16182D", border: "1px solid #1e3a5f", borderRadius: 6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
                 <span className="tag" style={{ background: "#1e3a5f", color: "#60a5fa", fontSize: 11 }}>
                   {entry.hypothesis.id}
                 </span>
                 <span style={{ fontSize: 12, color: "#60a5fa", fontWeight: 500 }}>New hypothesis</span>
               </div>
-              <div style={{ fontSize: 13, color: "#c9d1d9", lineHeight: 1.6 }}>{entry.hypothesis.text}</div>
+              <div style={{ fontSize: 13, color: "#E6E8F0", lineHeight: 1.6 }}>{entry.hypothesis.text}</div>
             </div>
           )}
 
           {entry.type === "hypothesis_eval" && (() => {
             const vs = VERDICT_STYLE[entry.hypothesis.status] || VERDICT_STYLE.uncertain;
             return (
-              <div style={{ padding: "9px 12px", background: "#161b22", border: `1px solid ${vs.color}30`, borderRadius: 6 }}>
+              <div style={{ padding: "9px 12px", background: "#16182D", border: `1px solid ${vs.color}30`, borderRadius: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
                   <span className="tag" style={{ background: `${vs.color}15`, color: vs.color, fontSize: 11, border: `1px solid ${vs.color}30` }}>
                     {entry.hypothesis.id}
@@ -105,7 +105,7 @@ export default function LogEntry({ entry }) {
                   <span style={{ fontSize: 12, color: vs.color, fontWeight: 500 }}>{vs.icon} {vs.label}</span>
                 </div>
                 {entry.reasoning && (
-                  <div style={{ fontSize: 13, color: "#8b949e", lineHeight: 1.6 }}>{entry.reasoning}</div>
+                  <div style={{ fontSize: 13, color: "#B4B7D1", lineHeight: 1.6 }}>{entry.reasoning}</div>
                 )}
               </div>
             );
@@ -114,8 +114,8 @@ export default function LogEntry({ entry }) {
           {entry.type === "mode" && (
             <div style={{
               padding: "5px 10px",
-              background: "#161b22",
-              border: "1px solid #21262d",
+              background: "#16182D",
+              border: "1px solid #252863",
               borderRadius: 4,
               fontSize: 12,
               color: entry.mode === "reproduce" ? "#6C5CE7" : "#c084fc",
@@ -128,11 +128,11 @@ export default function LogEntry({ entry }) {
           )}
 
           {entry.type === "seed" && (
-            <div style={{ padding: "9px 12px", background: "#161b22", border: "1px solid #1e293b", borderLeft: "3px solid #60a5fa", borderRadius: 6 }}>
+            <div style={{ padding: "9px 12px", background: "#16182D", border: "1px solid #252863", borderLeft: "3px solid #60a5fa", borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: "#60a5fa", letterSpacing: 0.5, marginBottom: 6, fontWeight: 600, textTransform: "uppercase" }}>Statistical Pre-Analysis</div>
               {entry.summary
-                ? <div style={{ fontSize: 12, color: "#8b949e", lineHeight: 1.7, whiteSpace: "pre-line" }}>{entry.summary}</div>
-                : <div style={{ fontSize: 12, color: "#334155" }}>No common groups across datasets — agent starting without seed hypotheses.</div>
+                ? <div style={{ fontSize: 12, color: "#B4B7D1", lineHeight: 1.7, whiteSpace: "pre-line" }}>{entry.summary}</div>
+                : <div style={{ fontSize: 12, color: "#7A7FA6" }}>No common groups across datasets — agent starting without seed hypotheses.</div>
               }
             </div>
           )}

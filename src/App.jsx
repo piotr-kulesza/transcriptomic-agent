@@ -7,32 +7,32 @@ import { setGroupMappings, uploadDegDataset } from "./api";
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body,#root{background:#0d1117;width:100%;height:100%;overflow:hidden}
-  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#161b22}::-webkit-scrollbar-thumb{background:#6C5CE733;border-radius:3px}
+  html,body,#root{background:#0E1020;width:100%;height:100%;overflow:hidden}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#16182D}::-webkit-scrollbar-thumb{background:#6C5CE733;border-radius:3px}
   ::-webkit-scrollbar-thumb:hover{background:#6C5CE755}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   @keyframes si{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
   @keyframes dots{0%,100%{content:''}33%{content:'.'}66%{content:'..'}99%{content:'...'}}
   .thinking-indicator::after{content:'';animation:dots 1.2s steps(1) infinite}
   @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-  .spinner{width:16px;height:16px;border:2px solid #1e1a35;border-top-color:#6C5CE7;border-radius:50%;animation:spin 0.8s linear infinite}
+  .spinner{width:16px;height:16px;border:2px solid #12142A;border-top-color:#6C5CE7;border-radius:50%;animation:spin 0.8s linear infinite}
   .ent{animation:si .15s ease}
   .blink{animation:pulse 1.2s infinite}
-  .btn{background:#161b22;border:1px solid #30363d;color:#c9d1d9;font-family:inherit;font-size:13px;padding:7px 14px;cursor:pointer;transition:background .15s,border-color .15s;width:100%;border-radius:6px;font-weight:500}
-  .btn:hover{background:#21262d;border-color:#8b949e}.btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn{background:#16182D;border:1px solid #252863;color:#E6E8F0;font-family:inherit;font-size:13px;padding:7px 14px;cursor:pointer;transition:background .15s,border-color .15s;width:100%;border-radius:6px;font-weight:500}
+  .btn:hover{background:#1D2040;border-color:#B4B7D1}.btn:disabled{opacity:.4;cursor:not-allowed}
   .bsm{padding:4px 10px;width:auto;font-size:12px}.bdng{border-color:#6e2020;color:#f87171;background:transparent}.bdng:hover{background:#2d0c0c;border-color:#f87171}
-  .slot{border:1px solid #21262d;padding:12px;margin-bottom:8px;background:#161b22;border-radius:6px;transition:border-color .15s}
+  .slot{border:1px solid #252863;padding:12px;margin-bottom:8px;background:#16182D;border-radius:6px;transition:border-color .15s}
   .slot.ok{border-color:#6C5CE733}
-  .uz{border:1px dashed #30363d;padding:10px;text-align:center;cursor:pointer;transition:all .15s;background:#0d1117;display:block;margin-bottom:6px;font-size:13px;color:#64748b;border-radius:4px}
-  .uz:hover{border-color:#6C5CE788;background:#1a1535;color:#b8b1f7}
-  .uz.ok{border-color:#6C5CE744;background:#130f2a;color:#6C5CE7}
+  .uz{border:1px dashed #252863;padding:10px;text-align:center;cursor:pointer;transition:all .15s;background:#0E1020;display:block;margin-bottom:6px;font-size:13px;color:#7A7FA6;border-radius:4px}
+  .uz:hover{border-color:#6C5CE788;background:#1D2040;color:#b8b1f7}
+  .uz.ok{border-color:#6C5CE744;background:#12142A;color:#6C5CE7}
   .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
-  input[type=text],select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px;transition:border-color .15s}
+  input[type=text],select{background:#0E1020;border:1px solid #252863;color:#E6E8F0;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px;transition:border-color .15s}
   input[type=text]:focus,select:focus{outline:none;border-color:#6C5CE766}
-  input[type=number]{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px;transition:border-color .15s}
+  input[type=number]{background:#0E1020;border:1px solid #252863;color:#E6E8F0;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px;transition:border-color .15s}
   input[type=number]:focus{outline:none;border-color:#6C5CE766}
   .sec{font-size:10px;color:#6C5CE7;letter-spacing:1px;margin:16px 0 8px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:8px}
-  .sec::after{content:'';flex:1;height:1px;background:#21262d}
+  .sec::after{content:'';flex:1;height:1px;background:#252863}
 `;
 
 const VERDICT_STYLE = {
@@ -218,14 +218,14 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0d1117", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", color: "#c9d1d9" }}>
+    <div style={{ minHeight: "100vh", background: "#0E1020", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", color: "#E6E8F0" }}>
       <style>{STYLES}</style>
 
       {/* Header */}
-      <div style={{ borderBottom: "1px solid #21262d", padding: "11px 20px", display: "flex", alignItems: "center", gap: 12, background: "#161b22" }}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: phase === "running" ? "#6C5CE7" : "#21262d", boxShadow: phase === "running" ? "0 0 8px #6C5CE788" : "none", flexShrink: 0, transition: "all .3s" }} className={phase === "running" ? "blink" : ""} />
+      <div style={{ borderBottom: "1px solid #252863", padding: "11px 20px", display: "flex", alignItems: "center", gap: 12, background: "#16182D" }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: phase === "running" ? "#6C5CE7" : "#252863", boxShadow: phase === "running" ? "0 0 8px #6C5CE788" : "none", flexShrink: 0, transition: "all .3s" }} className={phase === "running" ? "blink" : ""} />
         <span style={{ fontSize: 14, fontWeight: 600, color: "#6C5CE7", letterSpacing: 0.3 }}>Transcriptomic Agent</span>
-        <span style={{ fontSize: 12, color: "#334155", paddingLeft: 4 }}>Multi-dataset · Cross-cohort</span>
+        <span style={{ fontSize: 12, color: "#7A7FA6", paddingLeft: 4 }}>Multi-dataset · Cross-cohort</span>
         {phase === "running" && !currentStatus && (
           <span style={{ marginLeft: "auto", fontSize: 12, color: "#6C5CE7", opacity: 0.7 }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>
         )}
@@ -234,7 +234,7 @@ export default function App() {
       <div style={{ display: "flex", height: "calc(100vh - 46px)" }}>
 
         {/* LEFT PANEL */}
-        <div style={{ width: 284, borderRight: "1px solid #21262d", padding: "12px", overflowY: "auto", flexShrink: 0, background: "#0d1117" }}>
+        <div style={{ width: 284, borderRight: "1px solid #252863", padding: "12px", overflowY: "auto", flexShrink: 0, background: "#12142A" }}>
           <div className="sec">Datasets</div>
 
           {slots.map(slot => (
@@ -279,9 +279,9 @@ export default function App() {
                     onClick={() => setDegDatasets(prev => prev.filter(x => x.name !== d.name))}>✕</button>
                 </div>
                 {(d.comparisons || []).map((c, i) => (
-                  <div key={i} style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.8, fontFamily: "'JetBrains Mono',monospace" }}>
-                    {c.groupA} <span style={{ color: "#334155" }}>vs</span> {c.groupB}
-                    <span style={{ color: "#64748b", marginLeft: 6 }}>{c.n_genes} genes</span>
+                  <div key={i} style={{ fontSize: 12, color: "#B4B7D1", lineHeight: 1.8, fontFamily: "'JetBrains Mono',monospace" }}>
+                    {c.groupA} <span style={{ color: "#7A7FA6" }}>vs</span> {c.groupB}
+                    <span style={{ color: "#7A7FA6", marginLeft: 6 }}>{c.n_genes} genes</span>
                   </div>
                 ))}
               </div>
@@ -292,7 +292,7 @@ export default function App() {
             <div className="sec">Group Columns</div>
             {loaded.map(ds => (
               <div key={ds.id} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 5, fontWeight: 500 }}>{ds.name}</div>
+                <div style={{ fontSize: 13, color: "#B4B7D1", marginBottom: 5, fontWeight: 500 }}>{ds.name}</div>
                 <select value={groupMap[ds.id] || ds.group_col} onChange={async e => {
                     const newCol = e.target.value;
                     setGroupMap(prev => ({ ...prev, [ds.id]: newCol }));
@@ -314,10 +314,10 @@ export default function App() {
                     </option>
                   ))}
                 </select>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 5, lineHeight: 1.9, fontFamily: "'JetBrains Mono',monospace" }}>
+                <div style={{ fontSize: 12, color: "#7A7FA6", marginTop: 5, lineHeight: 1.9, fontFamily: "'JetBrains Mono',monospace" }}>
                   {ds.groups.map(g => <div key={g} style={{ paddingLeft: 2 }}>{g}</div>)}
                 </div>
-                <div style={{ fontSize: 12, color: "#334155", marginTop: 4 }}>{ds.gene_count} genes · {ds.sample_count} samples</div>
+                <div style={{ fontSize: 12, color: "#7A7FA6", marginTop: 4 }}>{ds.gene_count} genes · {ds.sample_count} samples</div>
               </div>
             ))}
 
@@ -334,7 +334,7 @@ export default function App() {
                   {mappingsOpen && (
                     <div style={{ marginBottom: 10 }}>
                       {mappingGroups.map((mg, idx) => (
-                        <div key={idx} style={{ marginBottom: 8, padding: "8px 10px", border: "1px solid #21262d", background: "#161b22", borderRadius: 6 }}>
+                        <div key={idx} style={{ marginBottom: 8, padding: "8px 10px", border: "1px solid #252863", background: "#16182D", borderRadius: 6 }}>
                           <div style={{ display: "flex", gap: 5, marginBottom: 6 }}>
                             <input type="text" value={mg.canonical} placeholder="Canonical name"
                               onChange={e => updateMappingCanonical(idx, e.target.value)}
@@ -343,7 +343,7 @@ export default function App() {
                           </div>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 5 }}>
                             {allGroups.map(g => (
-                              <label key={g} style={{ fontSize: 12, color: mg.aliases.has(g) ? "#6C5CE7" : "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                              <label key={g} style={{ fontSize: 12, color: mg.aliases.has(g) ? "#6C5CE7" : "#7A7FA6", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                                 <input type="checkbox" checked={mg.aliases.has(g)}
                                   onChange={e => toggleAlias(idx, g, e.target.checked)} />
                                 {g}
@@ -351,9 +351,9 @@ export default function App() {
                             ))}
                           </div>
                           {mg.canonical && (
-                            <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.6, fontFamily: "'JetBrains Mono',monospace" }}>
+                            <div style={{ fontSize: 11, color: "#7A7FA6", lineHeight: 1.6, fontFamily: "'JetBrains Mono',monospace" }}>
                               "{mg.canonical}" ← {allGroups.map(g => (
-                                <span key={g} style={{ marginRight: 6, color: mg.aliases.has(g) ? "#6C5CE7" : "#334155" }}>
+                                <span key={g} style={{ marginRight: 6, color: mg.aliases.has(g) ? "#6C5CE7" : "#7A7FA6" }}>
                                   {g} {mg.aliases.has(g) ? "✓" : "✗"}
                                 </span>
                               ))}
@@ -371,7 +371,7 @@ export default function App() {
             })()}
 
             <div className="sec">Mode</div>
-            <div style={{ display: "flex", background: "#0d1117", borderRadius: 6, border: "1px solid #21262d", padding: 3, marginBottom: 12, gap: 2 }}>
+            <div style={{ display: "flex", background: "#0E1020", borderRadius: 6, border: "1px solid #252863", padding: 3, marginBottom: 12, gap: 2 }}>
               {[
                 { key: "reproduce", label: "Reproduce", sub: "deterministic" },
                 { key: "explore",   label: "Explore",   sub: "creative" },
@@ -379,14 +379,14 @@ export default function App() {
                 <button key={key} onClick={() => setAgentMode(key)}
                   style={{
                     flex: 1,
-                    background: agentMode === key ? "#1a1535" : "transparent",
+                    background: agentMode === key ? "#16182D" : "transparent",
                     border: agentMode === key ? "1px solid #6C5CE733" : "1px solid transparent",
-                    color: agentMode === key ? "#6C5CE7" : "#64748b",
+                    color: agentMode === key ? "#6C5CE7" : "#7A7FA6",
                     padding: "5px 8px", cursor: "pointer", borderRadius: 4, transition: "all .15s",
                     fontFamily: "inherit", fontSize: 12, fontWeight: agentMode === key ? 500 : 400,
                   }}>
                   {label}
-                  <div style={{ fontSize: 10, color: agentMode === key ? "#b8b1f7" : "#334155", marginTop: 1 }}>{sub}</div>
+                  <div style={{ fontSize: 10, color: agentMode === key ? "#b8b1f7" : "#7A7FA6", marginTop: 1 }}>{sub}</div>
                 </button>
               ))}
             </div>
@@ -399,14 +399,14 @@ export default function App() {
             <button
               style={{
                 width: "100%", padding: "9px 14px", border: "1px solid transparent", borderRadius: 6,
-                background: phase === "running" ? "#161b22" : "#2d1f6e",
-                borderColor: phase === "running" ? "#30363d" : "#6C5CE744",
-                color: phase === "running" ? "#94a3b8" : "#6C5CE7",
+                background: phase === "running" ? "#16182D" : "#1D2040",
+                borderColor: phase === "running" ? "#252863" : "#6C5CE744",
+                color: phase === "running" ? "#B4B7D1" : "#6C5CE7",
                 fontFamily: "inherit", fontSize: 13, fontWeight: 600,
                 cursor: "pointer", transition: "all .15s",
               }}
-              onMouseEnter={e => { if (phase !== "running") { e.target.style.background = "#251a5a"; e.target.style.borderColor = "#6C5CE788"; } }}
-              onMouseLeave={e => { if (phase !== "running") { e.target.style.background = "#2d1f6e"; e.target.style.borderColor = "#6C5CE744"; } }}
+              onMouseEnter={e => { if (phase !== "running") { e.target.style.background = "#252863"; e.target.style.borderColor = "#7D6CFF88"; e.target.style.color = "#7D6CFF"; } }}
+              onMouseLeave={e => { if (phase !== "running") { e.target.style.background = "#1D2040"; e.target.style.borderColor = "#6C5CE744"; e.target.style.color = "#6C5CE7"; } }}
               onClick={phase === "running" ? () => abortRef.current?.abort() : runAgent}>
               {phase === "running" ? "Stop" : "Start Agent"}
             </button>
@@ -418,10 +418,10 @@ export default function App() {
 
           {/* sticky status bar */}
           {currentStatus && (
-            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "8px 24px", borderBottom: "1px solid #21262d", background: "#161b22" }}>
+            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "8px 24px", borderBottom: "1px solid #252863", background: "#16182D" }}>
               <div className="spinner" />
               <span className="thinking-indicator" style={{ fontSize: 13, color: "#6C5CE7" }}>{currentStatus}</span>
-              {step > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>}
+              {step > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: "#7A7FA6" }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>}
             </div>
           )}
 
@@ -429,23 +429,23 @@ export default function App() {
             {log.length === 0 && !currentStatus && (
               <div style={{ textAlign: "center", marginTop: 100 }}>
                 <div style={{ fontSize: 28, opacity: .2, marginBottom: 14, color: "#6C5CE7" }}>◈</div>
-                <div style={{ fontSize: 15, color: "#4b5563", fontWeight: 500 }}>Load datasets and start the agent</div>
-                <div style={{ fontSize: 13, color: "#374151", marginTop: 8 }}>Backend: <code style={{ color: "#64748b", fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }}>uvicorn backend.main:app --reload</code></div>
+                <div style={{ fontSize: 15, color: "#7A7FA6", fontWeight: 500 }}>Load datasets and start the agent</div>
+                <div style={{ fontSize: 13, color: "#7A7FA6", marginTop: 8 }}>Backend: <code style={{ color: "#B4B7D1", fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }}>uvicorn backend.main:app --reload</code></div>
               </div>
             )}
             {log.length === 0 && currentStatus && (
               <div style={{ textAlign: "center", marginTop: 120 }}>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-                  <div style={{ width: 36, height: 36, border: "2px solid #1e1a35", borderTopColor: "#6C5CE7", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                  <div style={{ width: 36, height: 36, border: "2px solid #12142A", borderTopColor: "#6C5CE7", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                 </div>
                 <div style={{ fontSize: 14, color: "#6C5CE7", opacity: 0.8 }}>{currentStatus}</div>
-                <div style={{ fontSize: 12, color: "#374151", marginTop: 8 }}>This may take a few seconds...</div>
+                <div style={{ fontSize: 12, color: "#7A7FA6", marginTop: 8 }}>This may take a few seconds...</div>
               </div>
             )}
             {log.map(e => <LogEntry key={e.id} entry={e} />)}
             {streamingText && (
               <div className="ent" style={{ marginBottom: 12, borderLeft: "2px solid #6C5CE744", paddingLeft: 14 }}>
-                <div style={{ fontSize: 14, color: "#c9d1d9", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 14, color: "#E6E8F0", lineHeight: 1.7 }}>
                   {streamingText}<span className="blink" style={{ color: "#6C5CE7" }}>▋</span>
                 </div>
               </div>
@@ -456,28 +456,28 @@ export default function App() {
 
         {/* HYPOTHESIS PANEL */}
         {(phase === "running" || hypotheses.length > 0) && (
-          <div style={{ width: 272, borderLeft: "1px solid #21262d", padding: "12px", overflowY: "auto", flexShrink: 0, background: "#0d1117" }}>
+          <div style={{ width: 272, borderLeft: "1px solid #252863", padding: "12px", overflowY: "auto", flexShrink: 0, background: "#12142A" }}>
             <div className="sec">Hypotheses</div>
-            {hypotheses.length === 0 && <div style={{ fontSize: 13, color: "#334155" }}>Formulating hypotheses...</div>}
+            {hypotheses.length === 0 && <div style={{ fontSize: 13, color: "#7A7FA6" }}>Formulating hypotheses...</div>}
             {hypotheses.map(h => {
               const vs = VERDICT_STYLE[h.status] || VERDICT_STYLE.pending;
               return (
-                <div key={h.id} style={{ marginBottom: 10, padding: "10px 12px", background: "#161b22", border: "1px solid #21262d", borderRadius: 6, borderLeft: `3px solid ${vs.color}` }}>
+                <div key={h.id} style={{ marginBottom: 10, padding: "10px 12px", background: "#16182D", border: "1px solid #252863", borderRadius: 6, borderLeft: `3px solid ${vs.color}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                     <span className="tag" style={{ background: `${vs.color}18`, color: vs.color, fontSize: 11 }}>{h.id}</span>
                     <span style={{ fontSize: 12, color: vs.color, opacity: 0.9 }}>{vs.icon} {h.status}</span>
                   </div>
-                  <div style={{ fontSize: 13, color: "#c9d1d9", lineHeight: 1.6 }}>{h.text}</div>
+                  <div style={{ fontSize: 13, color: "#E6E8F0", lineHeight: 1.6 }}>{h.text}</div>
                   {h.evidence.length > 0 && (
-                    <div style={{ marginTop: 8, borderTop: "1px solid #21262d", paddingTop: 8 }}>
+                    <div style={{ marginTop: 8, borderTop: "1px solid #252863", paddingTop: 8 }}>
                       {h.evidence.map((ev, i) => (
-                        <div key={i} style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6, marginBottom: 4 }}>
-                          <span style={{ color: "#8b949e" }}>step {ev.step} [{ev.action}]</span> {ev.reasoning}
+                        <div key={i} style={{ fontSize: 12, color: "#7A7FA6", lineHeight: 1.6, marginBottom: 4 }}>
+                          <span style={{ color: "#B4B7D1" }}>step {ev.step} [{ev.action}]</span> {ev.reasoning}
                           {ev.key_stats && Object.keys(ev.key_stats).length > 0 && (
-                            <div style={{ marginTop: 2, paddingLeft: 8, borderLeft: "2px solid #21262d", fontFamily: "'JetBrains Mono',monospace" }}>
+                            <div style={{ marginTop: 2, paddingLeft: 8, borderLeft: "2px solid #252863", fontFamily: "'JetBrains Mono',monospace" }}>
                               {Object.entries(ev.key_stats).map(([gene, s]) => (
-                                <span key={gene} style={{ display: "inline-block", marginRight: 10, color: "#64748b", fontSize: 11 }}>
-                                  <b style={{ color: "#94a3b8" }}>{gene}</b>{": "}
+                                <span key={gene} style={{ display: "inline-block", marginRight: 10, color: "#7A7FA6", fontSize: 11 }}>
+                                  <b style={{ color: "#B4B7D1" }}>{gene}</b>{": "}
                                   {Object.entries(s).filter(([, v]) => v != null).map(([k, v]) =>
                                     `${k}=${typeof v === "number" ? (Math.abs(v) < 0.001 ? v.toExponential(2) : v.toPrecision(3)) : Array.isArray(v) ? v.join(",") : v}`
                                   ).join("  ")}
