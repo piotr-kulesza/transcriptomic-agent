@@ -8,35 +8,38 @@ const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
   html,body,#root{background:#0d1117;width:100%;height:100%;overflow:hidden}
-  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#161b22}::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#161b22}::-webkit-scrollbar-thumb{background:#2dd4bf33;border-radius:3px}
+  ::-webkit-scrollbar-thumb:hover{background:#2dd4bf55}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   @keyframes si{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
   @keyframes dots{0%,100%{content:''}33%{content:'.'}66%{content:'..'}99%{content:'...'}}
   .thinking-indicator::after{content:'';animation:dots 1.2s steps(1) infinite}
   @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-  .spinner{width:16px;height:16px;border:2px solid #30363d;border-top-color:#388bfd;border-radius:50%;animation:spin 0.8s linear infinite}
+  .spinner{width:16px;height:16px;border:2px solid #1e3a38;border-top-color:#2dd4bf;border-radius:50%;animation:spin 0.8s linear infinite}
   .ent{animation:si .15s ease}
-  .blink{animation:pulse 1.5s infinite}
-  .btn{background:#21262d;border:1px solid #30363d;color:#c9d1d9;font-family:inherit;font-size:13px;padding:7px 14px;cursor:pointer;transition:background .15s,border-color .15s;width:100%;border-radius:6px;font-weight:500}
-  .btn:hover{background:#2d333b;border-color:#8b949e}.btn:disabled{opacity:.4;cursor:not-allowed}
-  .bsm{padding:4px 10px;width:auto;font-size:12px}.bdng{border-color:#6e2020;color:#f85149;background:transparent}.bdng:hover{background:#3d0c0c;border-color:#f85149}
-  .slot{border:1px solid #21262d;padding:12px;margin-bottom:8px;background:#161b22;border-radius:6px}
-  .slot.ok{border-color:#2d5a3d}
-  .uz{border:1px dashed #30363d;padding:10px;text-align:center;cursor:pointer;transition:all .15s;background:#0d1117;display:block;margin-bottom:6px;font-size:13px;color:#8b949e;border-radius:4px}
-  .uz:hover,.uz.ok{border-color:#388bfd;background:#0d1f3c;color:#79c0ff}
+  .blink{animation:pulse 1.2s infinite}
+  .btn{background:#161b22;border:1px solid #30363d;color:#c9d1d9;font-family:inherit;font-size:13px;padding:7px 14px;cursor:pointer;transition:background .15s,border-color .15s;width:100%;border-radius:6px;font-weight:500}
+  .btn:hover{background:#21262d;border-color:#8b949e}.btn:disabled{opacity:.4;cursor:not-allowed}
+  .bsm{padding:4px 10px;width:auto;font-size:12px}.bdng{border-color:#6e2020;color:#f87171;background:transparent}.bdng:hover{background:#2d0c0c;border-color:#f87171}
+  .slot{border:1px solid #21262d;padding:12px;margin-bottom:8px;background:#161b22;border-radius:6px;transition:border-color .15s}
+  .slot.ok{border-color:#2dd4bf33}
+  .uz{border:1px dashed #30363d;padding:10px;text-align:center;cursor:pointer;transition:all .15s;background:#0d1117;display:block;margin-bottom:6px;font-size:13px;color:#64748b;border-radius:4px}
+  .uz:hover{border-color:#2dd4bf88;background:#0a2a28;color:#5eead4}
+  .uz.ok{border-color:#2dd4bf44;background:#0a1f1e;color:#2dd4bf}
   .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
-  input[type=text],select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px}
-  input[type=text]:focus,select:focus{outline:none;border-color:#388bfd}
-  input[type=number]{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px}
-  input[type=number]:focus{outline:none;border-color:#388bfd}
-  .sec{font-size:11px;color:#6e7681;letter-spacing:0.8px;margin:16px 0 8px;font-weight:600;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid #21262d}
+  input[type=text],select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px;transition:border-color .15s}
+  input[type=text]:focus,select:focus{outline:none;border-color:#2dd4bf66}
+  input[type=number]{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px;transition:border-color .15s}
+  input[type=number]:focus{outline:none;border-color:#2dd4bf66}
+  .sec{font-size:10px;color:#2dd4bf;letter-spacing:1px;margin:16px 0 8px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .sec::after{content:'';flex:1;height:1px;background:#21262d}
 `;
 
 const VERDICT_STYLE = {
-  confirmed: { color: "#3fb950", icon: "✓" },
-  rejected:  { color: "#f85149", icon: "✗" },
-  uncertain: { color: "#d29922", icon: "?" },
-  pending:   { color: "#388bfd", icon: "○" },
+  confirmed: { color: "#4ade80", icon: "✓" },
+  rejected:  { color: "#f87171", icon: "✗" },
+  uncertain: { color: "#fbbf24", icon: "?" },
+  pending:   { color: "#94a3b8", icon: "○" },
 };
 
 export default function App() {
@@ -219,12 +222,12 @@ export default function App() {
       <style>{STYLES}</style>
 
       {/* Header */}
-      <div style={{ borderBottom: "1px solid #21262d", padding: "11px 20px", display: "flex", alignItems: "center", gap: 10, background: "#161b22" }}>
-        <div style={{ width: 7, height: 7, borderRadius: "50%", background: phase === "running" ? "#3fb950" : "#30363d", flexShrink: 0 }} className={phase === "running" ? "blink" : ""} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#e6edf3" }}>Transcriptomic Agent</span>
-        <span style={{ fontSize: 12, color: "#484f58" }}>Multi-dataset · Cross-cohort</span>
+      <div style={{ borderBottom: "1px solid #21262d", padding: "11px 20px", display: "flex", alignItems: "center", gap: 12, background: "#161b22" }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: phase === "running" ? "#2dd4bf" : "#21262d", boxShadow: phase === "running" ? "0 0 8px #2dd4bf88" : "none", flexShrink: 0, transition: "all .3s" }} className={phase === "running" ? "blink" : ""} />
+        <span style={{ fontSize: 14, fontWeight: 600, color: "#2dd4bf", letterSpacing: 0.3 }}>Transcriptomic Agent</span>
+        <span style={{ fontSize: 12, color: "#334155", paddingLeft: 4 }}>Multi-dataset · Cross-cohort</span>
         {phase === "running" && !currentStatus && (
-          <span style={{ marginLeft: "auto", fontSize: 12, color: "#8b949e" }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>
+          <span style={{ marginLeft: "auto", fontSize: 12, color: "#2dd4bf", opacity: 0.7 }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>
         )}
       </div>
 
@@ -240,7 +243,7 @@ export default function App() {
           ))}
 
           <button className="btn bsm" style={{ marginBottom: 6, width: "100%" }} onClick={addSlot}>+ Add dataset</button>
-          <button className="btn" style={{ marginBottom: 10 }} onClick={loadAll} disabled={!slots.some(s => s.exprFile && s.metaFile)}>
+          <button className="btn" style={{ marginBottom: 10, borderColor: "#2dd4bf33", color: "#2dd4bf" }} onClick={loadAll} disabled={!slots.some(s => s.exprFile && s.metaFile)}>
             Load data
           </button>
 
@@ -262,23 +265,23 @@ export default function App() {
             </button>
             {degStatus && (
               <div style={{ fontSize: 12, marginBottom: 8, padding: "5px 8px", borderRadius: 4,
-                color: degStatus.startsWith("Error") ? "#f85149" : "#3fb950",
-                background: degStatus.startsWith("Error") ? "#3d0c0c" : "#0d2714",
-                border: `1px solid ${degStatus.startsWith("Error") ? "#6e202033" : "#2d5a3d"}` }}>
+                color: degStatus.startsWith("Error") ? "#f87171" : "#4ade80",
+                background: degStatus.startsWith("Error") ? "#2d0c0c" : "#0a1f12",
+                border: `1px solid ${degStatus.startsWith("Error") ? "#6e202044" : "#4ade8033"}` }}>
                 {degStatus}
               </div>
             )}
             {degDatasets.map(d => (
               <div key={d.name} className="slot ok" style={{ marginBottom: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, color: "#8b949e", fontWeight: 500 }}>{d.name}</span>
+                  <span style={{ fontSize: 13, color: "#2dd4bf", fontWeight: 500 }}>{d.name}</span>
                   <button className="btn bsm bdng" style={{ padding: "2px 8px", fontSize: 11 }}
                     onClick={() => setDegDatasets(prev => prev.filter(x => x.name !== d.name))}>✕</button>
                 </div>
                 {(d.comparisons || []).map((c, i) => (
-                  <div key={i} style={{ fontSize: 12, color: "#6e9fd4", lineHeight: 1.8, fontFamily: "'JetBrains Mono',monospace" }}>
-                    {c.groupA} <span style={{ color: "#484f58" }}>vs</span> {c.groupB}
-                    <span style={{ color: "#6e7681", marginLeft: 6 }}>{c.n_genes} genes</span>
+                  <div key={i} style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.8, fontFamily: "'JetBrains Mono',monospace" }}>
+                    {c.groupA} <span style={{ color: "#334155" }}>vs</span> {c.groupB}
+                    <span style={{ color: "#64748b", marginLeft: 6 }}>{c.n_genes} genes</span>
                   </div>
                 ))}
               </div>
@@ -289,7 +292,7 @@ export default function App() {
             <div className="sec">Group Columns</div>
             {loaded.map(ds => (
               <div key={ds.id} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 13, color: "#8b949e", marginBottom: 5, fontWeight: 500 }}>{ds.name}</div>
+                <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 5, fontWeight: 500 }}>{ds.name}</div>
                 <select value={groupMap[ds.id] || ds.group_col} onChange={async e => {
                     const newCol = e.target.value;
                     setGroupMap(prev => ({ ...prev, [ds.id]: newCol }));
@@ -311,10 +314,10 @@ export default function App() {
                     </option>
                   ))}
                 </select>
-                <div style={{ fontSize: 12, color: "#6e7681", marginTop: 5, lineHeight: 1.9, fontFamily: "'JetBrains Mono',monospace" }}>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 5, lineHeight: 1.9, fontFamily: "'JetBrains Mono',monospace" }}>
                   {ds.groups.map(g => <div key={g} style={{ paddingLeft: 2 }}>{g}</div>)}
                 </div>
-                <div style={{ fontSize: 12, color: "#484f58", marginTop: 4 }}>{ds.gene_count} genes · {ds.sample_count} samples</div>
+                <div style={{ fontSize: 12, color: "#334155", marginTop: 4 }}>{ds.gene_count} genes · {ds.sample_count} samples</div>
               </div>
             ))}
 
@@ -323,10 +326,10 @@ export default function App() {
               const allGroups = [...new Set(loaded.flatMap(ds => ds.groups))];
               return (
                 <>
-                  <div className="sec" style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", userSelect: "none" }}
+                  <div className="sec" style={{ cursor: "pointer", userSelect: "none" }}
                     onClick={() => setMappingsOpen(p => !p)}>
                     <span>Group Mappings</span>
-                    <span style={{ color: "#8b949e", fontSize: 13 }}>{mappingsOpen ? "▾" : "▸"}</span>
+                    <span style={{ color: "#2dd4bf", fontSize: 12, marginLeft: -4 }}>{mappingsOpen ? "▾" : "▸"}</span>
                   </div>
                   {mappingsOpen && (
                     <div style={{ marginBottom: 10 }}>
@@ -340,7 +343,7 @@ export default function App() {
                           </div>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 5 }}>
                             {allGroups.map(g => (
-                              <label key={g} style={{ fontSize: 12, color: mg.aliases.has(g) ? "#388bfd" : "#6e7681", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                              <label key={g} style={{ fontSize: 12, color: mg.aliases.has(g) ? "#2dd4bf" : "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                                 <input type="checkbox" checked={mg.aliases.has(g)}
                                   onChange={e => toggleAlias(idx, g, e.target.checked)} />
                                 {g}
@@ -348,9 +351,9 @@ export default function App() {
                             ))}
                           </div>
                           {mg.canonical && (
-                            <div style={{ fontSize: 11, color: "#6e7681", lineHeight: 1.6, fontFamily: "'JetBrains Mono',monospace" }}>
+                            <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.6, fontFamily: "'JetBrains Mono',monospace" }}>
                               "{mg.canonical}" ← {allGroups.map(g => (
-                                <span key={g} style={{ marginRight: 6, color: mg.aliases.has(g) ? "#388bfd" : "#30363d" }}>
+                                <span key={g} style={{ marginRight: 6, color: mg.aliases.has(g) ? "#2dd4bf" : "#334155" }}>
                                   {g} {mg.aliases.has(g) ? "✓" : "✗"}
                                 </span>
                               ))}
@@ -368,21 +371,22 @@ export default function App() {
             })()}
 
             <div className="sec">Mode</div>
-            <div style={{ display: "flex", background: "#0d1117", borderRadius: 6, border: "1px solid #30363d", padding: 3, marginBottom: 12, gap: 2 }}>
+            <div style={{ display: "flex", background: "#0d1117", borderRadius: 6, border: "1px solid #21262d", padding: 3, marginBottom: 12, gap: 2 }}>
               {[
                 { key: "reproduce", label: "Reproduce", sub: "deterministic" },
                 { key: "explore",   label: "Explore",   sub: "creative" },
               ].map(({ key, label, sub }) => (
                 <button key={key} onClick={() => setAgentMode(key)}
                   style={{
-                    flex: 1, background: agentMode === key ? "#21262d" : "transparent",
-                    border: agentMode === key ? "1px solid #30363d" : "1px solid transparent",
-                    color: agentMode === key ? "#c9d1d9" : "#6e7681",
+                    flex: 1,
+                    background: agentMode === key ? "#0a2a28" : "transparent",
+                    border: agentMode === key ? "1px solid #2dd4bf33" : "1px solid transparent",
+                    color: agentMode === key ? "#2dd4bf" : "#64748b",
                     padding: "5px 8px", cursor: "pointer", borderRadius: 4, transition: "all .15s",
                     fontFamily: "inherit", fontSize: 12, fontWeight: agentMode === key ? 500 : 400,
                   }}>
                   {label}
-                  <div style={{ fontSize: 10, color: agentMode === key ? "#8b949e" : "#484f58", marginTop: 1 }}>{sub}</div>
+                  <div style={{ fontSize: 10, color: agentMode === key ? "#5eead4" : "#334155", marginTop: 1 }}>{sub}</div>
                 </button>
               ))}
             </div>
@@ -394,12 +398,15 @@ export default function App() {
 
             <button
               style={{
-                width: "100%", padding: "8px 14px", border: "1px solid transparent", borderRadius: 6,
-                background: phase === "running" ? "#21262d" : "#1f6feb",
-                borderColor: phase === "running" ? "#30363d" : "transparent",
-                color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-                cursor: "pointer", transition: "background .15s",
+                width: "100%", padding: "9px 14px", border: "1px solid transparent", borderRadius: 6,
+                background: phase === "running" ? "#161b22" : "#0d4a44",
+                borderColor: phase === "running" ? "#30363d" : "#2dd4bf44",
+                color: phase === "running" ? "#94a3b8" : "#2dd4bf",
+                fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                cursor: "pointer", transition: "all .15s",
               }}
+              onMouseEnter={e => { if (phase !== "running") { e.target.style.background = "#0a3a36"; e.target.style.borderColor = "#2dd4bf88"; } }}
+              onMouseLeave={e => { if (phase !== "running") { e.target.style.background = "#0d4a44"; e.target.style.borderColor = "#2dd4bf44"; } }}
               onClick={phase === "running" ? () => abortRef.current?.abort() : runAgent}>
               {phase === "running" ? "Stop" : "Start Agent"}
             </button>
@@ -413,35 +420,33 @@ export default function App() {
           {currentStatus && (
             <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "8px 24px", borderBottom: "1px solid #21262d", background: "#161b22" }}>
               <div className="spinner" />
-              <span className="thinking-indicator" style={{ fontSize: 13, color: "#c9d1d9" }}>{currentStatus}</span>
-              {step > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: "#6e7681" }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>}
+              <span className="thinking-indicator" style={{ fontSize: 13, color: "#2dd4bf" }}>{currentStatus}</span>
+              {step > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>}
             </div>
           )}
 
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
             {log.length === 0 && !currentStatus && (
               <div style={{ textAlign: "center", marginTop: 100 }}>
-                <div style={{ fontSize: 32, opacity: .12, marginBottom: 14, color: "#8b949e" }}>◈</div>
-                <div style={{ fontSize: 15, color: "#6e7681", fontWeight: 500 }}>Load datasets and start the agent</div>
-                <div style={{ fontSize: 13, color: "#484f58", marginTop: 8 }}>Backend: <code style={{ color: "#8b949e", fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }}>uvicorn backend.main:app --reload</code></div>
+                <div style={{ fontSize: 28, opacity: .2, marginBottom: 14, color: "#2dd4bf" }}>◈</div>
+                <div style={{ fontSize: 15, color: "#4b5563", fontWeight: 500 }}>Load datasets and start the agent</div>
+                <div style={{ fontSize: 13, color: "#374151", marginTop: 8 }}>Backend: <code style={{ color: "#64748b", fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }}>uvicorn backend.main:app --reload</code></div>
               </div>
             )}
             {log.length === 0 && currentStatus && (
               <div style={{ textAlign: "center", marginTop: 120 }}>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-                  <div style={{ width: 36, height: 36, border: "2px solid #21262d", borderTopColor: "#388bfd", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                  <div style={{ width: 36, height: 36, border: "2px solid #1e3a38", borderTopColor: "#2dd4bf", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                 </div>
-                <div style={{ fontSize: 14, color: "#8b949e" }}>{currentStatus}</div>
-                <div style={{ fontSize: 12, color: "#484f58", marginTop: 8 }}>This may take a few seconds...</div>
+                <div style={{ fontSize: 14, color: "#2dd4bf", opacity: 0.8 }}>{currentStatus}</div>
+                <div style={{ fontSize: 12, color: "#374151", marginTop: 8 }}>This may take a few seconds...</div>
               </div>
             )}
             {log.map(e => <LogEntry key={e.id} entry={e} />)}
             {streamingText && (
-              <div className="ent" style={{ marginBottom: 12, borderLeft: "2px solid #30363d", paddingLeft: 14 }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
-                  <div style={{ fontSize: 14, color: "#c9d1d9", lineHeight: 1.7 }}>
-                    {streamingText}<span className="blink" style={{ color: "#388bfd" }}>▋</span>
-                  </div>
+              <div className="ent" style={{ marginBottom: 12, borderLeft: "2px solid #2dd4bf44", paddingLeft: 14 }}>
+                <div style={{ fontSize: 14, color: "#c9d1d9", lineHeight: 1.7 }}>
+                  {streamingText}<span className="blink" style={{ color: "#2dd4bf" }}>▋</span>
                 </div>
               </div>
             )}
@@ -453,26 +458,26 @@ export default function App() {
         {(phase === "running" || hypotheses.length > 0) && (
           <div style={{ width: 272, borderLeft: "1px solid #21262d", padding: "12px", overflowY: "auto", flexShrink: 0, background: "#0d1117" }}>
             <div className="sec">Hypotheses</div>
-            {hypotheses.length === 0 && <div style={{ fontSize: 13, color: "#484f58" }}>Agent is formulating hypotheses...</div>}
+            {hypotheses.length === 0 && <div style={{ fontSize: 13, color: "#334155" }}>Formulating hypotheses...</div>}
             {hypotheses.map(h => {
               const vs = VERDICT_STYLE[h.status] || VERDICT_STYLE.pending;
               return (
-                <div key={h.id} style={{ marginBottom: 10, padding: "10px 12px", background: "#161b22", border: `1px solid #21262d`, borderRadius: 6, borderLeft: `3px solid ${vs.color}` }}>
+                <div key={h.id} style={{ marginBottom: 10, padding: "10px 12px", background: "#161b22", border: "1px solid #21262d", borderRadius: 6, borderLeft: `3px solid ${vs.color}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                    <span className="tag" style={{ background: `${vs.color}18`, color: vs.color }}>{h.id}</span>
-                    <span style={{ fontSize: 12, color: vs.color }}>{vs.icon} {h.status}</span>
+                    <span className="tag" style={{ background: `${vs.color}18`, color: vs.color, fontSize: 11 }}>{h.id}</span>
+                    <span style={{ fontSize: 12, color: vs.color, opacity: 0.9 }}>{vs.icon} {h.status}</span>
                   </div>
                   <div style={{ fontSize: 13, color: "#c9d1d9", lineHeight: 1.6 }}>{h.text}</div>
                   {h.evidence.length > 0 && (
                     <div style={{ marginTop: 8, borderTop: "1px solid #21262d", paddingTop: 8 }}>
                       {h.evidence.map((ev, i) => (
-                        <div key={i} style={{ fontSize: 12, color: "#6e7681", lineHeight: 1.6, marginBottom: 4 }}>
+                        <div key={i} style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6, marginBottom: 4 }}>
                           <span style={{ color: "#8b949e" }}>step {ev.step} [{ev.action}]</span> {ev.reasoning}
                           {ev.key_stats && Object.keys(ev.key_stats).length > 0 && (
                             <div style={{ marginTop: 2, paddingLeft: 8, borderLeft: "2px solid #21262d", fontFamily: "'JetBrains Mono',monospace" }}>
                               {Object.entries(ev.key_stats).map(([gene, s]) => (
-                                <span key={gene} style={{ display: "inline-block", marginRight: 10, color: "#6e7681", fontSize: 11 }}>
-                                  <b style={{ color: "#8b949e" }}>{gene}</b>{": "}
+                                <span key={gene} style={{ display: "inline-block", marginRight: 10, color: "#64748b", fontSize: 11 }}>
+                                  <b style={{ color: "#94a3b8" }}>{gene}</b>{": "}
                                   {Object.entries(s).filter(([, v]) => v != null).map(([k, v]) =>
                                     `${k}=${typeof v === "number" ? (Math.abs(v) < 0.001 ? v.toExponential(2) : v.toPrecision(3)) : Array.isArray(v) ? v.join(",") : v}`
                                   ).join("  ")}
