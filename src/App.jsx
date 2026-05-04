@@ -508,10 +508,7 @@ export default function App() {
               <div style={{ textAlign: "center", marginTop: "26vh" }}>
                 <div style={{ width: 52, height: 52, margin: "0 auto 20px", background: `${t.accent}10`, border: `1px solid ${t.accent}20`, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: `${t.accent}50` }}>◈</div>
                 <div style={{ fontSize: 15, color: t.textSecondary, fontWeight: 600, marginBottom: 8 }}>Ready to analyze</div>
-                <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 20 }}>Load datasets from the left panel, then start the agent</div>
-                <code style={{ fontSize: 12, color: t.textSecondary, fontFamily: "'JetBrains Mono',monospace", background: t.cardBg, border: `1px solid ${t.border}`, padding: "6px 12px", borderRadius: 6 }}>
-                  uvicorn backend.main:app --reload
-                </code>
+                <div style={{ fontSize: 13, color: t.textMuted }}>Load datasets from the left panel, then start the agent</div>
               </div>
             )}
             {log.length === 0 && currentStatus && (
