@@ -258,6 +258,16 @@ async def run_agent_loop(
                 f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\n"
                 "FINAL STEP — safety limit reached. Evaluate any remaining hypotheses as uncertain and call DONE."
             )
+        elif evaluated >= max_hypotheses:
+            user_content = (
+                f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated — TARGET REACHED]. {summary_block}\n\n"
+                "You have evaluated all required hypotheses. Write a comprehensive final summary in the thought field covering:\n"
+                "- Each hypothesis (S1..Sn, H1..Hn): verdict, key evidence, and supporting statistics\n"
+                "- Most important genes and their expression patterns\n"
+                "- Key pathways or biological mechanisms identified\n"
+                "- Overall biological conclusion\n"
+                "Then call DONE with this summary as the thought."
+            )
         else:
             user_content = f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\nWhat will you investigate?"
 

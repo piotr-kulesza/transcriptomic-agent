@@ -225,4 +225,4 @@ STATISTICAL CAUTION:
 
 {strategy}
 
-END: {{"action":"DONE","params":{{}},"hypothesis_action":null,"thought":"summary of discoveries and hypothesis evaluations"}}"""
+END: {{"action":"DONE","params":{{}},"hypothesis_action":null,"thought":"Comprehensive summary: verdict + key evidence for each hypothesis; most important genes and expression patterns; key pathways/mechanisms; overall biological conclusion."}}"""
