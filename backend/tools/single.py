@@ -567,7 +567,8 @@ def gene_network_hub(datasets, datasetName=None, topN=30, corrThreshold=0.6, use
         edges.append(edge)
     edges.sort(key=lambda e: -e["r"])
 
-    return {
+    interpretation = f"Top hub: {top_hubs[0]['gene']} ({top_hubs[0]['degree']} connections)" if top_hubs else "No hubs found at this threshold"
+    result = {
         "dataset": ds["name"],
         "corr_threshold": corrThreshold,
         "use_permutation_threshold": use_permutation_threshold,
@@ -575,5 +576,11 @@ def gene_network_hub(datasets, datasetName=None, topN=30, corrThreshold=0.6, use
         "n_genes_tested": len(top_genes),
         "top_hubs": top_hubs,
         "top_edges": edges[:20],
-        "interpretation": f"Top hub: {top_hubs[0]['gene']} ({top_hubs[0]['degree']} connections)" if top_hubs else "No hubs found at this threshold",
+        "interpretation": interpretation,
     }
+    if len(edges) < 10:
+        result["warning"] = (
+            f"Only {len(edges)} edges found — network is too sparse to interpret meaningfully. "
+            f"This dataset has {len(expr.columns)} samples; consider skipping gene_network_hub for datasets with fewer than 30 samples."
+        )
+    return result

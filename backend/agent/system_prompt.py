@@ -11,8 +11,10 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
         lines = []
         for name, ds in deg_datasets.items():
             for comp in ds["comparisons"]:
+                n_sig = int(((comp["df"]["adj_p"] < 0.05) & (comp["df"]["logFC"].abs() > 0.5)).sum())
+                sig_note = f"{n_sig} significant" if n_sig > 0 else "\u26a0 0 significant genes at adj_p<0.05 |logFC|>0.5 \u2014 pathway_enrichment will fail on this dataset"
                 lines.append(
-                    f"  \u2022 {name}: {comp['groupA']} vs {comp['groupB']} ({len(comp['df'])} genes)"
+                    f"  \u2022 {name}: {comp['groupA']} vs {comp['groupB']} ({len(comp['df'])} total genes, {sig_note})"
                 )
         if lines:
             deg_section = (
@@ -52,14 +54,21 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
             "- subgroup_discovery: {datasetName, group} \u2014 subgroups within a group (PCA + KMeans)\n"
             "- gene_network_hub: {datasetName, topN, corrThreshold} \u2014 co-expression network hubs\n"
             "  WARNING: corrThreshold must match sample size \u2014 use \u22640.5 for n<30 samples, \u22640.6 for n<50. "
-            "Higher thresholds on small datasets produce near-empty networks (< 10 edges) that are uninterpretable."
+            "If the result contains a 'warning' field the network is too sparse \u2014 skip interpretation and do not use as hypothesis evidence."
         )
         cross_header = "TOOLS \u2014 cross-dataset (PRIORITIZE):"
-        extra_cross_tools = (
-            "- cross_dataset_correlation: {genes[]}\n"
-            "- invariant_axis: {groupA, groupB, topN}\n"
-            "- cross_dataset_rewiring: {gene1, gene2}"
-        )
+        if len(datasets) >= 2:
+            extra_cross_tools = (
+                "- cross_dataset_correlation: {genes[]}\n"
+                "- invariant_axis: {groupA, groupB, topN}\n"
+                "- cross_dataset_rewiring: {gene1, gene2}"
+            )
+        else:
+            extra_cross_tools = (
+                "- cross_dataset_correlation: NOT AVAILABLE (requires \u22652 raw expression datasets)\n"
+                "- invariant_axis: NOT AVAILABLE (requires \u22652 raw expression datasets)\n"
+                "- cross_dataset_rewiring: NOT AVAILABLE (requires \u22652 raw expression datasets)"
+            )
         execute_code_block = (
             "SPECIAL TOOL \u2014 execute_code:\n"
             "When no existing tool is sufficient, write your own Python code.\n"

@@ -365,9 +365,13 @@ async def run_agent_loop(
                 report_steps.append({"step": step_num, "thought": thought, "action": "DONE", "params": {},
                                      "blocked": f"DONE blocked — only {evaluated}/{max_hypotheses} hypotheses evaluated, pending: {pending_ids}"})
                 messages.append({"role": "assistant", "content": raw})
+                if pending_ids:
+                    detail = f"Evaluate the pending hypotheses first: {pending_ids}."
+                else:
+                    remaining = max_hypotheses - evaluated
+                    detail = f"You need to propose and evaluate {remaining} more hypothesis{'es' if remaining > 1 else ''} — none are currently pending, so propose a new one."
                 messages.append({"role": "user", "content": (
-                    f"ERROR: Cannot call DONE yet — only {evaluated}/{max_hypotheses} hypotheses have been evaluated. "
-                    f"Still pending: {pending_ids}. Investigate and evaluate them before calling DONE."
+                    f"ERROR: Cannot call DONE yet — only {evaluated}/{max_hypotheses} hypotheses evaluated. {detail}"
                 )})
                 continue
             yield {"type": "done", "text": thought}
