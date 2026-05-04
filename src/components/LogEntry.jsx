@@ -25,57 +25,55 @@ const VERDICT_STYLE = {
   pending:   { color: "#94a3b8", icon: "○", label: "Pending"    },
 };
 
-export default function LogEntry({ entry }) {
+export default function LogEntry({ entry, theme: t }) {
   const [expanded, setExpanded] = useState(false);
   const ac = ACTION_COLORS[entry.action] || "#94a3b8";
-
   const isStep = entry.type === "thinking";
 
   return (
-    <div className="ent" style={{ marginBottom: isStep ? 20 : 10, marginTop: isStep ? 16 : 0, paddingLeft: isStep ? 0 : 14, borderLeft: isStep ? "none" : "2px solid #252863" }}>
+    <div className="ent" style={{ marginBottom: isStep ? 24 : 8, marginTop: isStep ? 20 : 0 }}>
       <div
-        style={{ display: "flex", alignItems: "flex-start", gap: 9, cursor: entry.type === "result" ? "pointer" : "default" }}
+        style={{ display: "flex", alignItems: "flex-start", cursor: entry.type === "result" ? "pointer" : "default" }}
         onClick={() => entry.type === "result" && setExpanded(e => !e)}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
 
           {entry.type === "thinking" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ flex: 1, height: 1, background: "#252863" }} />
-              <span style={{ fontSize: 11, color: "#6C5CE7", letterSpacing: 0.8, whiteSpace: "nowrap", fontWeight: 600, opacity: 0.8 }}>
-                {entry.text.replace("Agent thinking... ", "").toUpperCase()}
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ flex: 1, height: 1, background: t.border }} />
+              <span style={{ fontSize: 10, color: t.accent, letterSpacing: 1.5, whiteSpace: "nowrap", fontWeight: 700, textTransform: "uppercase" }}>
+                {entry.text.replace("Agent thinking... ", "")}
               </span>
-              <div style={{ flex: 1, height: 1, background: "#252863" }} />
+              <div style={{ flex: 1, height: 1, background: t.border }} />
             </div>
           )}
 
           {entry.type === "thought" && (
-            <div style={{ fontSize: 14, color: "#E6E8F0", lineHeight: 1.7 }}>{entry.text}</div>
+            <div style={{ fontSize: 14, color: t.textPrimary, lineHeight: 1.75, paddingLeft: 16, borderLeft: `2px solid ${t.border}` }}>
+              {entry.text}
+            </div>
           )}
 
           {entry.type === "code" && (
-            <div>
-              <div style={{ fontSize: 12, color: "#a78bfa", marginBottom: 5, fontWeight: 500 }}>Custom code</div>
-              <pre style={{ padding: 10, background: "#16182D", border: "1px solid #252863", fontSize: 12, color: "#c4b5fd", overflowX: "auto", maxHeight: 160, lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
+            <div style={{ paddingLeft: 16, borderLeft: `2px solid ${t.border}` }}>
+              <div style={{ fontSize: 10, color: t.codeText, marginBottom: 6, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>Code</div>
+              <pre style={{ padding: "10px 12px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 12, color: t.codeText, overflowX: "auto", maxHeight: 180, lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
                 {entry.code}
               </pre>
             </div>
           )}
 
           {entry.type === "result" && (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-                <span
-                  className="tag"
-                  style={{ background: `${ac}15`, color: ac, fontWeight: 600, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", border: `1px solid ${ac}30` }}
-                >
+            <div style={{ paddingLeft: 16, borderLeft: `2px solid ${ac}35` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span className="tag" style={{ background: `${ac}15`, color: ac, fontWeight: 600, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", border: `1px solid ${ac}30` }}>
                   {entry.action}
                 </span>
-                <span style={{ fontSize: 13, color: "#B4B7D1", flex: 1 }}>{entry.summary}</span>
-                <span style={{ fontSize: 12, color: "#7A7FA6" }}>{expanded ? "▲" : "▼"}</span>
+                <span style={{ fontSize: 13, color: t.textSecondary, flex: 1, lineHeight: 1.5 }}>{entry.summary}</span>
+                <span style={{ fontSize: 11, color: t.textMuted }}>{expanded ? "▲" : "▼"}</span>
               </div>
               {expanded && (
-                <pre style={{ marginTop: 8, padding: 10, background: "#0E1020", border: "1px solid #252863", fontSize: 12, color: "#7A7FA6", overflowX: "auto", maxHeight: 300, overflowY: "auto", lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
+                <pre style={{ marginTop: 8, padding: "10px 12px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 12, color: t.textMuted, overflowX: "auto", maxHeight: 300, overflowY: "auto", lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
                   {JSON.stringify(entry.result, null, 2).slice(0, 4000)}
                 </pre>
               )}
@@ -83,70 +81,67 @@ export default function LogEntry({ entry }) {
           )}
 
           {entry.type === "hypothesis_propose" && (
-            <div style={{ padding: "9px 12px", background: "#16182D", border: "1px solid #1e3a5f", borderRadius: 6 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                <span className="tag" style={{ background: "#1e3a5f", color: "#60a5fa", fontSize: 11 }}>
+            <div style={{ padding: "10px 14px", background: t.cardBg, border: `1px solid ${t.accent}22`, borderLeft: `3px solid ${t.accent}`, borderRadius: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span className="tag" style={{ background: `${t.accent}18`, color: t.accent, fontSize: 11, border: `1px solid ${t.accent}30` }}>
                   {entry.hypothesis.id}
                 </span>
-                <span style={{ fontSize: 12, color: "#60a5fa", fontWeight: 500 }}>New hypothesis</span>
+                <span style={{ fontSize: 10, color: t.accent, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>New hypothesis</span>
               </div>
-              <div style={{ fontSize: 13, color: "#E6E8F0", lineHeight: 1.6 }}>{entry.hypothesis.text}</div>
+              <div style={{ fontSize: 13, color: t.textPrimary, lineHeight: 1.65 }}>{entry.hypothesis.text}</div>
             </div>
           )}
 
           {entry.type === "hypothesis_eval" && (() => {
             const vs = VERDICT_STYLE[entry.hypothesis.status] || VERDICT_STYLE.uncertain;
             return (
-              <div style={{ padding: "9px 12px", background: "#16182D", border: `1px solid ${vs.color}30`, borderRadius: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+              <div style={{ padding: "10px 14px", background: t.cardBg, border: `1px solid ${vs.color}22`, borderLeft: `3px solid ${vs.color}`, borderRadius: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: entry.reasoning ? 6 : 0 }}>
                   <span className="tag" style={{ background: `${vs.color}15`, color: vs.color, fontSize: 11, border: `1px solid ${vs.color}30` }}>
                     {entry.hypothesis.id}
                   </span>
-                  <span style={{ fontSize: 12, color: vs.color, fontWeight: 500 }}>{vs.icon} {vs.label}</span>
+                  <span style={{ fontSize: 10, color: vs.color, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>{vs.icon} {vs.label}</span>
                 </div>
                 {entry.reasoning && (
-                  <div style={{ fontSize: 13, color: "#B4B7D1", lineHeight: 1.6 }}>{entry.reasoning}</div>
+                  <div style={{ fontSize: 13, color: t.textSecondary, lineHeight: 1.65 }}>{entry.reasoning}</div>
                 )}
               </div>
             );
           })()}
 
           {entry.type === "mode" && (
-            <div style={{
-              padding: "5px 10px",
-              background: "#16182D",
-              border: "1px solid #252863",
-              borderRadius: 4,
-              fontSize: 12,
-              color: entry.mode === "reproduce" ? "#6C5CE7" : "#c084fc",
-              marginBottom: 8,
-            }}>
-              {entry.mode === "reproduce"
-                ? "Reproduce mode — temperature=0, fully deterministic"
-                : "Explore mode — temperature=1, creative exploration"}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "4px 10px", background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 4, fontSize: 12, color: entry.mode === "reproduce" ? t.accent : "#c084fc", marginBottom: 4 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor", opacity: 0.7, flexShrink: 0 }} />
+              {entry.mode === "reproduce" ? "Reproduce — deterministic" : "Explore — creative"}
             </div>
           )}
 
           {entry.type === "seed" && (
-            <div style={{ padding: "9px 12px", background: "#16182D", border: "1px solid #252863", borderLeft: "3px solid #60a5fa", borderRadius: 6 }}>
-              <div style={{ fontSize: 11, color: "#60a5fa", letterSpacing: 0.5, marginBottom: 6, fontWeight: 600, textTransform: "uppercase" }}>Statistical Pre-Analysis</div>
+            <div style={{ padding: "12px 14px", background: t.cardBg, border: `1px solid ${t.border}`, borderLeft: "3px solid #60a5fa", borderRadius: 6 }}>
+              <div style={{ fontSize: 10, color: "#60a5fa", letterSpacing: 1.5, marginBottom: 8, fontWeight: 700, textTransform: "uppercase" }}>Pre-Analysis</div>
               {entry.summary
-                ? <div style={{ fontSize: 12, color: "#B4B7D1", lineHeight: 1.7, whiteSpace: "pre-line" }}>{entry.summary}</div>
-                : <div style={{ fontSize: 12, color: "#7A7FA6" }}>No common groups across datasets — agent starting without seed hypotheses.</div>
+                ? <div style={{ fontSize: 12, color: t.textSecondary, lineHeight: 1.75, whiteSpace: "pre-line" }}>{entry.summary}</div>
+                : <div style={{ fontSize: 12, color: t.textMuted }}>No common groups across datasets — starting without seed hypotheses.</div>
               }
             </div>
           )}
 
           {entry.type === "error" && (
-            <span style={{ fontSize: 13, color: "#f87171" }}>{entry.text}</span>
+            <div style={{ fontSize: 13, color: "#f87171", padding: "6px 10px", background: "#f8717110", border: "1px solid #f8717125", borderRadius: 4 }}>
+              {entry.text}
+            </div>
           )}
 
           {entry.type === "done" && !entry.exhausted && (
-            <span style={{ fontSize: 14, color: "#4ade80", fontWeight: 600 }}>{entry.text}</span>
+            <div style={{ fontSize: 14, color: "#4ade80", fontWeight: 600, padding: "8px 14px", background: "#4ade8010", border: "1px solid #4ade8025", borderRadius: 6 }}>
+              {entry.text}
+            </div>
           )}
 
           {entry.type === "done" && entry.exhausted && (
-            <span style={{ fontSize: 13, color: "#fbbf24" }}>⚠ {entry.text}</span>
+            <div style={{ fontSize: 13, color: "#fbbf24", padding: "6px 10px", background: "#fbbf2410", border: "1px solid #fbbf2425", borderRadius: 4 }}>
+              ⚠ {entry.text}
+            </div>
           )}
 
         </div>
