@@ -283,22 +283,25 @@ export default function App() {
       <style>{makeStyles(t)}</style>
 
       {/* Header */}
-      <div style={{ borderBottom: `1px solid ${t.border}`, height: 48, padding: "0 20px", display: "flex", alignItems: "center", gap: 12, background: t.sidebarBg, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 7, background: `${t.accent}18`, border: `1px solid ${t.accent}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: t.accent, flexShrink: 0 }}>
+      <div style={{ height: 62, padding: "0 24px", display: "flex", alignItems: "center", gap: 14, background: t.sidebarBg, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(90deg, ${t.accent}0a 0%, transparent 55%)`, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, ${t.accent}60 0%, ${t.accent}18 40%, transparent 75%)`, pointerEvents: "none" }} />
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, zIndex: 1 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, ${t.accent}28, ${t.accent}0e)`, border: `1px solid ${t.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, color: t.accent, flexShrink: 0, boxShadow: `0 0 16px ${t.accent}20` }}>
             ◈
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: t.textPrimary, lineHeight: 1.2 }}>Transcriptomic Agent</div>
-            <div style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.2 }}>Multi-dataset · Cross-cohort</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: t.textPrimary, letterSpacing: -0.3, lineHeight: 1.25 }}>Transcriptomic Agent</div>
+            <div style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.25, marginTop: 2, letterSpacing: 0.1 }}>AI-powered multi-dataset transcriptomic analysis</div>
           </div>
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, zIndex: 1 }}>
           {phase === "running" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: t.accent, boxShadow: `0 0 6px ${t.accent}`, flexShrink: 0 }} className="blink" />
-              <span style={{ fontSize: 12, color: t.textMuted }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "4px 10px", background: `${t.accent}10`, border: `1px solid ${t.accent}28`, borderRadius: 5 }}>
+              <div className="blink" style={{ width: 6, height: 6, borderRadius: "50%", background: t.accent, boxShadow: `0 0 6px ${t.accent}`, flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: t.accent, fontWeight: 500 }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>
             </div>
           )}
           <button
@@ -312,7 +315,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ display: "flex", height: "calc(100vh - 48px)" }}>
+      <div style={{ display: "flex", height: "calc(100vh - 62px)" }}>
 
         {/* LEFT PANEL */}
         <div style={{ width: 288, borderRight: `1px solid ${t.border}`, padding: "8px 14px 14px", overflowY: "auto", flexShrink: 0, background: t.sidebarBg }}>
@@ -508,7 +511,7 @@ export default function App() {
               <div style={{ textAlign: "center", marginTop: "26vh" }}>
                 <div style={{ width: 52, height: 52, margin: "0 auto 20px", background: `${t.accent}10`, border: `1px solid ${t.accent}20`, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: `${t.accent}50` }}>◈</div>
                 <div style={{ fontSize: 15, color: t.textSecondary, fontWeight: 600, marginBottom: 8 }}>Ready to analyze</div>
-                <div style={{ fontSize: 13, color: t.textMuted }}>Load datasets from the left panel, then start the agent</div>
+                <div style={{ fontSize: 13, color: t.textMuted }}>Load datasets from the left panel, then start the agent!</div>
               </div>
             )}
             {log.length === 0 && currentStatus && (
