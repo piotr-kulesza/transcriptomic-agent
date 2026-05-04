@@ -156,6 +156,8 @@ def _write_report(datasets: list, seed_summary: str, seed_data: dict, steps: lis
                     lines.append(f"  Parameters: {param_str}")
             if s.get("code"):
                 lines.append(f"\n```python\n{s['code']}\n```")
+        if s.get("blocked"):
+            lines.append(f"\n**Blocked:** _{s['blocked']}_\n")
         if s.get("summary"):
             lines.append(f"\n**Result:** {s['summary']}\n")
         if s.get("error"):
@@ -304,6 +306,8 @@ async def run_agent_loop(
         # Guard: reject tools that may only be called once per run
         if action in _ONCE_ONLY and action in once_only_called:
             logger.warning("Once-only tool [%s] called again at step %d — blocking", action, step_num)
+            report_steps.append({"step": step_num, "thought": thought, "action": action, "params": params,
+                                  "blocked": f"'{action}' may only be called once per run — blocked"})
             messages.append({"role": "assistant", "content": raw})
             messages.append({"role": "user", "content": (
                 f"CRITICAL ERROR: '{action}' may only be called once per run and has already been called. "
@@ -315,6 +319,8 @@ async def run_agent_loop(
         current_call = (action, json.dumps(params, sort_keys=True, default=str))
         if action not in ("DONE", "hypothesis_action") and current_call == last_call:
             logger.warning("Duplicate tool call [%s] at step %d — forcing agent to advance", action, step_num)
+            report_steps.append({"step": step_num, "thought": thought, "action": action, "params": params,
+                                  "blocked": f"Duplicate call to '{action}' with identical parameters — blocked"})
             messages.append({"role": "assistant", "content": raw})
             messages.append({"role": "user", "content": (
                 f"CRITICAL ERROR: You just called '{action}' with identical parameters as the previous step. "
@@ -343,6 +349,8 @@ async def run_agent_loop(
             pending = [h["id"] for h in hypotheses if h["status"] == "pending"]
             if pending and not is_last:
                 logger.warning("Agent called DONE at step %d with pending hypotheses: %s", step_num, pending)
+                report_steps.append({"step": step_num, "thought": thought, "action": "DONE", "params": {},
+                                     "blocked": f"DONE blocked — pending hypotheses: {pending}"})
                 messages.append({"role": "assistant", "content": raw})
                 messages.append({"role": "user", "content": (
                     f"ERROR: Cannot call DONE — the following hypotheses are still PENDING: {pending}. "
@@ -359,6 +367,8 @@ async def run_agent_loop(
         # Guard: model sometimes puts "hypothesis_action" in the action field by mistake
         if action == "hypothesis_action":
             logger.warning("Agent used 'hypothesis_action' as action at step %d — skipping tool call", step_num)
+            report_steps.append({"step": step_num, "thought": thought, "action": action, "params": params,
+                                  "blocked": "'hypothesis_action' used as action field — blocked (not a valid tool name)"})
             messages.append({"role": "assistant", "content": raw})
             messages.append({"role": "user", "content": "ERROR: 'hypothesis_action' is not a valid tool name. The 'action' field must be a tool name like differential_expression, execute_code, etc. The 'hypothesis_action' is a separate JSON field. Please retry with a valid tool."})
             continue
@@ -370,6 +380,8 @@ async def run_agent_loop(
         # Guard: DEG-only mode — block tools that require raw expression data
         if _deg_only and action not in _DEG_ONLY_ALLOWED:
             logger.warning("DEG-only mode: blocked tool [%s] at step %d", action, step_num)
+            report_steps.append({"step": step_num, "thought": thought, "action": action, "params": params,
+                                  "blocked": f"DEG-only mode: '{action}' requires raw expression data — blocked"})
             messages.append({"role": "assistant", "content": raw})
             messages.append({"role": "user", "content": (
                 f"ERROR: No raw expression datasets are loaded. "

@@ -50,7 +50,9 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
             "if deg_dataset_name is provided, significant DE genes are extracted automatically from that DEG dataset (use adj_p<0.05, |logFC|>0.5)\n"
             "- batch_detection: {datasetName, genes[]} \u2014 is the axis a batch artifact?\n"
             "- subgroup_discovery: {datasetName, group} \u2014 subgroups within a group (PCA + KMeans)\n"
-            "- gene_network_hub: {datasetName, topN, corrThreshold} \u2014 co-expression network hubs"
+            "- gene_network_hub: {datasetName, topN, corrThreshold} \u2014 co-expression network hubs\n"
+            "  WARNING: corrThreshold must match sample size \u2014 use \u22640.5 for n<30 samples, \u22640.6 for n<50. "
+            "Higher thresholds on small datasets produce near-empty networks (< 10 edges) that are uninterpretable."
         )
         cross_header = "TOOLS \u2014 cross-dataset (PRIORITIZE):"
         extra_cross_tools = (
