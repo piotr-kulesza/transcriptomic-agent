@@ -95,16 +95,13 @@ function renderThought(text, t) {
 }
 
 export default function LogEntry({ entry, theme: t }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const ac = ACTION_COLORS[entry.action] || "#94a3b8";
   const isStep = entry.type === "thinking";
 
   return (
     <div className="ent" style={{ marginBottom: isStep ? 24 : 8, marginTop: isStep ? 20 : 0 }}>
-      <div
-        style={{ display: "flex", alignItems: "flex-start", cursor: entry.type === "result" ? "pointer" : "default" }}
-        onClick={() => entry.type === "result" && setExpanded(e => !e)}
-      >
+      <div style={{ display: "flex", alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
 
           {entry.type === "thinking" && (
@@ -134,18 +131,15 @@ export default function LogEntry({ entry, theme: t }) {
 
           {entry.type === "result" && (
             <div style={{ paddingLeft: 16, borderLeft: `2px solid ${ac}35` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
                 <span className="tag" style={{ background: `${ac}15`, color: ac, fontWeight: 600, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", border: `1px solid ${ac}30` }}>
                   {entry.action}
                 </span>
                 <span style={{ fontSize: 13, color: t.textSecondary, flex: 1, lineHeight: 1.5 }}>{entry.summary}</span>
-                <span style={{ fontSize: 11, color: t.textMuted }}>{expanded ? "▲" : "▼"}</span>
               </div>
-              {expanded && (
-                <pre style={{ marginTop: 8, padding: "10px 12px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 12, color: t.textMuted, overflowX: "auto", maxHeight: 300, overflowY: "auto", lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
-                  {JSON.stringify(entry.result, null, 2).slice(0, 4000)}
-                </pre>
-              )}
+              <pre style={{ margin: 0, padding: "10px 12px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 12, color: t.textMuted, overflowX: "auto", maxHeight: 400, overflowY: "auto", lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
+                {JSON.stringify(entry.result, null, 2).slice(0, 6000)}
+              </pre>
             </div>
           )}
 
@@ -202,9 +196,13 @@ export default function LogEntry({ entry, theme: t }) {
           )}
 
           {entry.type === "done" && !entry.exhausted && (
-            <div style={{ padding: "14px 16px", background: "#4ade8008", border: "1px solid #4ade8025", borderLeft: "3px solid #4ade80", borderRadius: 6 }}>
-              <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>
-                Analysis Complete
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                <div style={{ flex: 1, height: 1, background: "#4ade8040" }} />
+                <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                  ✓ Analysis Complete
+                </span>
+                <div style={{ flex: 1, height: 1, background: "#4ade8040" }} />
               </div>
               {renderSummary(entry.text, t)}
             </div>

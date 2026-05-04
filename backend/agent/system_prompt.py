@@ -168,7 +168,7 @@ FORMAT (strict JSON, nothing else \u2014 fields MUST appear in this exact order)
 
 IMPORTANT:
 - "action" MUST come first \u2014 always a tool name (e.g. differential_expression, execute_code, DONE). NEVER use "hypothesis_action" as the action value.
-- "thought" MUST come last \u2014 keep it under 60 words
+- "thought" MUST come last \u2014 keep it under 60 words (exception: DONE thought must contain the full structured summary)
 
 HYPOTHESIS VERDICT CRITERIA \u2014 apply strictly:
 - "confirmed": ONLY when adj_p < 0.05 AND n >= 5 per group AND effect is consistent across tools. Both significance AND adequate sample size required.
