@@ -210,6 +210,7 @@ export default function App() {
       if (errMsg) { setDegStatus(`Error: ${errMsg}`); return; }
       setDegDatasets(prev => [...prev.filter(d => d.name !== res.name), res]);
       setDegStatus(`Uploaded: ${res.n_genes} genes (${res.groupA} vs ${res.groupB})`);
+      setMappingsOpen(true);
       setDegFile(null);
       setDegGroupA("");
       setDegGroupB("");
@@ -407,7 +408,8 @@ export default function App() {
 
             {/* GROUP MAPPINGS */}
             {(() => {
-              const allGroups = [...new Set(loaded.flatMap(ds => ds.groups))];
+              const degGroups = degDatasets.flatMap(d => (d.comparisons || []).flatMap(c => [c.groupA, c.groupB]));
+              const allGroups = [...new Set([...loaded.flatMap(ds => ds.groups), ...degGroups])];
               return (
                 <>
                   <div className="sec" style={{ cursor: "pointer", userSelect: "none" }}
