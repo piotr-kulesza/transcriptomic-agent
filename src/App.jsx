@@ -286,7 +286,7 @@ export default function App() {
       {/* Header */}
       <div style={{ height: 62, padding: "0 24px", display: "flex", alignItems: "center", gap: 14, background: t.sidebarBg, flexShrink: 0, position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, background: `linear-gradient(90deg, ${t.accent}0a 0%, transparent 55%)`, pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, ${t.accent}60 0%, ${t.accent}18 40%, transparent 75%)`, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: t.border, pointerEvents: "none" }} />
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, zIndex: 1 }}>
           <div style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, ${t.accent}28, ${t.accent}0e)`, border: `1px solid ${t.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, color: t.accent, flexShrink: 0, boxShadow: `0 0 16px ${t.accent}20` }}>
