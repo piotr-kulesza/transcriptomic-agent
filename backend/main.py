@@ -288,7 +288,7 @@ async def list_deg_datasets():
 class RunRequest(BaseModel):
     dataset_ids: list[str]
     group_cols: dict[str, str]  # dataset_id → chosen group_col
-    free_steps: int = 6
+    max_hypotheses: int = 3
     mode: str = "reproduce"  # "reproduce" | "explore"
 
 
@@ -301,7 +301,7 @@ async def run_agent(req: RunRequest):
     datasets = []
     for ds_id in req.dataset_ids:
         if ds_id not in _datasets:
-            raise HTTPException(status_code=404, detail=f"Dataset {ds_id} nie istnieje")
+            raise HTTPException(status_code=404, detail=f"Dataset {ds_id} not found")
         ds = dict(_datasets[ds_id])
         chosen_col = req.group_cols.get(ds_id, ds["group_col"])
         if chosen_col and chosen_col in ds["meta"].columns:
@@ -310,10 +310,10 @@ async def run_agent(req: RunRequest):
         datasets.append(ds)
 
     temperature = 0.0 if req.mode == "reproduce" else 1.0
-    logger.info("Run started: datasets=%s max_steps=%d mode=%s", req.dataset_ids, req.free_steps, req.mode)
+    logger.info("Run started: datasets=%s max_hypotheses=%d mode=%s", req.dataset_ids, req.max_hypotheses, req.mode)
 
     async def generate():
-        async for event in run_agent_loop(datasets, req.free_steps, api_key, temperature=temperature, mappings=dict(group_mappings), deg_datasets=dict(deg_store)):
+        async for event in run_agent_loop(datasets, req.max_hypotheses, api_key, temperature=temperature, mappings=dict(group_mappings), deg_datasets=dict(deg_store)):
             if event.get("type") == "error":
                 logger.error("Agent error: %s", event.get("text", ""))
             yield f"data: {json.dumps(event, default=str)}\n\n"

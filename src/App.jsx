@@ -115,7 +115,7 @@ export default function App() {
   const [log,           setLog]           = useState([]);
   const [hypotheses,    setHypotheses]    = useState([]);
   const [step,          setStep]          = useState(0);
-  const [freeSteps,     setFreeSteps]     = useState(6);
+  const [maxHypotheses, setMaxHypotheses] = useState(3);
   const [agentMode,     setAgentMode]     = useState("reproduce");
   const [currentStatus, setCurrentStatus] = useState("");
   const [streamingText, setStreamingText] = useState("");
@@ -233,7 +233,7 @@ export default function App() {
       const res = await fetch("http://localhost:8000/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataset_ids: loaded.map(d => d.id), group_cols: groupMap, free_steps: freeSteps, mode: agentMode }),
+        body: JSON.stringify({ dataset_ids: loaded.map(d => d.id), group_cols: groupMap, max_hypotheses: maxHypotheses, mode: agentMode }),
         signal: controller.signal,
       });
 
@@ -302,7 +302,9 @@ export default function App() {
           {phase === "running" && (
             <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "4px 10px", background: `${t.accent}10`, border: `1px solid ${t.accent}28`, borderRadius: 5 }}>
               <div className="blink" style={{ width: 6, height: 6, borderRadius: "50%", background: t.accent, boxShadow: `0 0 6px ${t.accent}`, flexShrink: 0 }} />
-              <span style={{ fontSize: 12, color: t.accent, fontWeight: 500 }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>
+              <span style={{ fontSize: 12, color: t.accent, fontWeight: 500 }}>
+                {hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} hypotheses
+              </span>
             </div>
           )}
           <button
@@ -475,9 +477,9 @@ export default function App() {
               ))}
             </div>
 
-            <div className="sec">Steps</div>
-            <input type="number" value={freeSteps} min={1} max={30}
-              onChange={e => setFreeSteps(parseInt(e.target.value))}
+            <div className="sec">Hypotheses to test</div>
+            <input type="number" value={maxHypotheses} min={1} max={10}
+              onChange={e => setMaxHypotheses(parseInt(e.target.value))}
               style={{ marginBottom: 14 }} />
 
             <button
@@ -504,7 +506,7 @@ export default function App() {
             <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "9px 24px", borderBottom: `1px solid ${t.border}`, background: t.sidebarBg }}>
               <div className="spinner" />
               <span className="thinking-indicator" style={{ fontSize: 13, color: t.accent }}>{currentStatus}</span>
-              {step > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: t.textMuted }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>}
+              {hypotheses.length > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: t.textMuted }}>{hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} evaluated</span>}
             </div>
           )}
 

@@ -193,7 +193,7 @@ def _write_report(datasets: list, seed_summary: str, seed_data: dict, steps: lis
 
 async def run_agent_loop(
     datasets: list,
-    max_steps: int,
+    max_hypotheses: int,
     api_key: str,
     temperature: float = 0.0,
     mappings: dict = None,
@@ -213,7 +213,8 @@ async def run_agent_loop(
     # ── Pre-analysis seeding ──────────────────────────────────────────────────
     loop = asyncio.get_event_loop()
     seeds, seed_summary, seed_data = await loop.run_in_executor(None, lambda: generate_seeds(datasets, mappings=mappings))
-    system_prompt = build_system_prompt(datasets, len(common_genes), seed_summary=seed_summary, deg_datasets=deg_datasets)
+    max_steps = max_hypotheses * 5  # safety cap: generous budget per hypothesis
+    system_prompt = build_system_prompt(datasets, len(common_genes), seed_summary=seed_summary, deg_datasets=deg_datasets, max_hypotheses=max_hypotheses)
     if mappings:
         mapping_text = "\n".join(
             f"  '{canonical}' = {aliases}"
@@ -251,17 +252,18 @@ async def run_agent_loop(
         )
 
         summary_block = f"{discovery_summary}{hypo_summary}"
+        evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
         if is_last:
             user_content = (
-                f"Step {step_num}/{max_steps}. {summary_block}\n\n"
-                "FINAL STEP — no more steps after this. Summarize all discoveries and hypothesis verdicts, then call DONE."
+                f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\n"
+                "FINAL STEP — safety limit reached. Evaluate any remaining hypotheses as uncertain and call DONE."
             )
         else:
-            user_content = f"Step {step_num}/{max_steps}. {summary_block}\n\nWhat will you investigate?"
+            user_content = f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\nWhat will you investigate?"
 
         messages.append({"role": "user", "content": user_content})
 
-        yield {"type": "thinking", "text": f"Agent thinking... ({step_num}/{max_steps})"}
+        yield {"type": "thinking", "text": f"Agent thinking... ({evaluated}/{max_hypotheses} hypotheses evaluated)"}
 
         raw = ""
         try:
@@ -346,15 +348,16 @@ async def run_agent_loop(
         loop = asyncio.get_event_loop()
 
         if action == "DONE":
-            pending = [h["id"] for h in hypotheses if h["status"] == "pending"]
-            if pending and not is_last:
-                logger.warning("Agent called DONE at step %d with pending hypotheses: %s", step_num, pending)
+            evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
+            if evaluated < max_hypotheses and not is_last:
+                pending_ids = [h["id"] for h in hypotheses if h["status"] == "pending"]
+                logger.warning("Agent called DONE at step %d with only %d/%d hypotheses evaluated", step_num, evaluated, max_hypotheses)
                 report_steps.append({"step": step_num, "thought": thought, "action": "DONE", "params": {},
-                                     "blocked": f"DONE blocked — pending hypotheses: {pending}"})
+                                     "blocked": f"DONE blocked — only {evaluated}/{max_hypotheses} hypotheses evaluated, pending: {pending_ids}"})
                 messages.append({"role": "assistant", "content": raw})
                 messages.append({"role": "user", "content": (
-                    f"ERROR: Cannot call DONE — the following hypotheses are still PENDING: {pending}. "
-                    "Evaluate each one (confirmed/rejected/uncertain) before calling DONE."
+                    f"ERROR: Cannot call DONE yet — only {evaluated}/{max_hypotheses} hypotheses have been evaluated. "
+                    f"Still pending: {pending_ids}. Investigate and evaluate them before calling DONE."
                 )})
                 continue
             yield {"type": "done", "text": thought}
@@ -469,10 +472,11 @@ async def run_agent_loop(
 
         messages.append({"role": "assistant", "content": raw})
         result_str = json.dumps(result, default=str)[:2500] if result is not None else "null"
-        messages.append({"role": "user", "content": f"Wynik {action}:\n{result_str}"})
+        messages.append({"role": "user", "content": f"Result of {action}:\n{result_str}"})
 
     # Loop exhausted without DONE — write report with what we have
-    done_text = "Step budget exhausted without a final summary."
+    evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
+    done_text = f"Safety step limit reached ({max_steps} steps). {evaluated}/{max_hypotheses} hypotheses evaluated."
     yield {"type": "done", "text": done_text, "exhausted": True}
     report_path = await loop.run_in_executor(
         None, _write_report, datasets, seed_summary, seed_data, report_steps, hypotheses, done_text

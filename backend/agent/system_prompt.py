@@ -1,4 +1,4 @@
-def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: str = "", deg_datasets: dict = None) -> str:
+def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: str = "", deg_datasets: dict = None, max_hypotheses: int = 3) -> str:
     ds_desc = "\n".join(
         f"  \u2022 {ds['name']}: {len(ds['expr'].index)} genes, {len(ds['expr'].columns)} samples, groups: [{', '.join(ds['groups'])}]"
         for ds in datasets
@@ -151,7 +151,8 @@ Manage hypotheses via the hypothesis_action field:
 Each step should either test an existing hypothesis (evaluate after result) or propose a new one.
 Do not propose and evaluate a hypothesis in the same step.
 Hypotheses must be specific and falsifiable.
-Do NOT call DONE while any hypothesis is still PENDING. Every hypothesis must be evaluated (confirmed/rejected/uncertain) before calling DONE.
+Your goal is to evaluate {max_hypotheses} hypotheses. Once you have evaluated that many (each confirmed/rejected/uncertain), call DONE immediately.
+Do NOT call DONE while you have fewer than {max_hypotheses} evaluated hypotheses. If you have already reached {max_hypotheses} evaluated, call DONE even if other hypotheses remain PENDING.
 
 FORMAT (strict JSON, nothing else \u2014 fields MUST appear in this exact order):
 {{"action":"tool_name","params":{{...}},"hypothesis_action":{{"type":"propose","text":"...","genes":["GENE1"]}} or {{"type":"evaluate","hypothesis_id":"H1","verdict":"confirmed","reasoning":"..."}} or null,"thought":"..."}}
