@@ -196,13 +196,13 @@ export default function LogEntry({ entry, theme: t }) {
           )}
 
           {entry.type === "done" && !entry.exhausted && (
-            <div style={{ marginTop: 12, border: "1px solid #4ade8035", borderRadius: 8, overflow: "hidden" }}>
-              <div style={{ padding: "10px 16px", background: "#4ade8018", borderBottom: "1px solid #4ade8030", display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ marginTop: 12, borderRadius: 8, overflow: "hidden", background: "#4ade80", color: "#052e16" }}>
+              <div style={{ padding: "10px 16px", background: "#22c55e", display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 15, lineHeight: 1 }}>✓</span>
-                <span style={{ fontSize: 12, color: "#4ade80", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>Analysis Complete</span>
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>Analysis Complete</span>
               </div>
               <div style={{ padding: "16px 20px" }}>
-                {renderSummary(entry.text, t)}
+                {renderSummary(entry.text, { ...t, textPrimary: "#052e16", textSecondary: "#14532d", accent: "#15803d" })}
               </div>
             </div>
           )}
