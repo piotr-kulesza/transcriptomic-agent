@@ -257,7 +257,10 @@ def pathway_enrichment(datasets: dict, genes: list = None, deg_datasets: dict = 
     import pandas as pd
 
     # Extract genes from a DEG dataset if requested
-    if deg_dataset_name and deg_datasets and deg_dataset_name in deg_datasets:
+    if deg_dataset_name:
+        if not deg_datasets or deg_dataset_name not in deg_datasets:
+            available = list(deg_datasets.keys()) if deg_datasets else []
+            return {"error": f"DEG dataset '{deg_dataset_name}' not found. Available: {available}"}
         ds = deg_datasets[deg_dataset_name]
         extracted = []
         for comp in ds["comparisons"]:
@@ -266,6 +269,8 @@ def pathway_enrichment(datasets: dict, genes: list = None, deg_datasets: dict = 
             extracted.extend(sig.index.tolist())
         if not genes:
             genes = list(set(extracted))
+        if not genes:
+            return {"error": f"No significant genes (adj_p<{adj_p_threshold}, |logFC|>{logfc_threshold}) found in DEG dataset '{deg_dataset_name}'"}
 
     try:
         all_gene_sets = _load_gene_sets()
@@ -277,7 +282,7 @@ def pathway_enrichment(datasets: dict, genes: list = None, deg_datasets: dict = 
     n = len(gene_set_input)
 
     if n == 0:
-        return {"error": "No genes provided"}
+        return {"error": "No genes provided — pass a gene list or a valid deg_dataset_name"}
 
     results = []
     for pathway, pw_genes in all_gene_sets.items():
