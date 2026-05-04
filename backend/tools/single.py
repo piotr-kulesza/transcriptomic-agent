@@ -135,6 +135,11 @@ def differential_expression(datasets, datasetName=None, groupA=None, groupB=None
     top_up   = sig[sig["logFC"] > 0].head(topN)[["gene", "logFC", "rbc", "adj_p"]].round({"logFC": 3, "rbc": 3, "adj_p": 4}).to_dict("records")
     top_down = sig[sig["logFC"] < 0].head(topN)[["gene", "logFC", "rbc", "adj_p"]].round({"logFC": 3, "rbc": 3, "adj_p": 4}).to_dict("records")
 
+    # Significant genes for pathway enrichment — sorted by |logFC| descending, filtered adj_p<0.05 and |logFC|>0.5
+    sig_strong = df[(df["adj_p"] < 0.05) & (df["logFC"].abs() > 0.5)].copy()
+    sig_genes_up   = sig_strong[sig_strong["logFC"] > 0].sort_values("logFC", ascending=False)["gene"].tolist()
+    sig_genes_down = sig_strong[sig_strong["logFC"] < 0].sort_values("logFC", ascending=True)["gene"].tolist()
+
     return {
         "dataset": ds["name"],
         "comparison": f"{groupA} vs {groupB}",
@@ -143,6 +148,8 @@ def differential_expression(datasets, datasetName=None, groupA=None, groupB=None
         "n_significant": n_bh_sig,
         "top_upregulated":   top_up,
         "top_downregulated": top_down,
+        "sig_genes_up":   sig_genes_up,
+        "sig_genes_down": sig_genes_down,
     }
 
 

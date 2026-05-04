@@ -44,12 +44,15 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
         single_tools_block = (
             "- dataset_summary\n"
             "- top_variable_genes: {datasetName, n}\n"
-            "- differential_expression: {datasetName, groupA, groupB, topN}\n"
+            "- differential_expression: {datasetName, groupA, groupB, topN} \u2014 returns sig_genes_up and sig_genes_down "
+            "(significant genes sorted by |logFC| descending, adj_p<0.05 and |logFC|>0.5); pass these directly to pathway_enrichment\n"
             "- gene_expression_by_group: {datasetName, genes[]}\n"
             "- nonlinear_rule: {datasetName, geneHigh, geneLow, targetGroup}\n"
             "- contextual_modules: {datasetName, contextGene, topN}\n"
-            "- pathway_enrichment: {genes[], deg_dataset_name} \u2014 enrichment against Hallmarks/KEGG; "
-            "if deg_dataset_name is provided, significant DE genes are extracted automatically from that DEG dataset (use adj_p<0.05, |logFC|>0.5)\n"
+            "- pathway_enrichment: {genes[], deg_dataset_name} \u2014 enrichment against Hallmarks/KEGG. "
+            "Two ways to provide genes: (1) genes[] \u2014 pass sig_genes_up or sig_genes_down from a differential_expression result; "
+            "(2) deg_dataset_name \u2014 ONLY for separately uploaded DEG table files (listed under DEG DATASETS above); "
+            "do NOT use deg_dataset_name for raw expression datasets\n"
             "- batch_detection: {datasetName, genes[]} \u2014 is the axis a batch artifact?\n"
             "- subgroup_discovery: {datasetName, group} \u2014 subgroups within a group (PCA + KMeans)\n"
             "- gene_network_hub: {datasetName, topN, corrThreshold} \u2014 co-expression network hubs\n"
@@ -146,7 +149,7 @@ Common genes across all datasets: {common_genes_count}
 
 {cross_header}
 - cross_dataset_de: {{groupA, groupB, topN}} \u2014 automatically includes any uploaded DEG datasets matching the comparison
-- pathway_enrichment: {{genes[], deg_dataset_name}} \u2014 enrichment against Hallmarks/KEGG; use deg_dataset_name to auto-extract significant genes from a DEG dataset
+- pathway_enrichment: {{genes[], deg_dataset_name}} \u2014 enrichment against Hallmarks/KEGG; pass sig_genes_up/sig_genes_down from differential_expression, or use deg_dataset_name to auto-extract significant genes from an uploaded DEG table file (NOT a raw expression dataset)
 {extra_cross_tools}
 {deg_tools_block}
 
