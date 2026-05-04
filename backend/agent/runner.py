@@ -261,20 +261,9 @@ async def run_agent_loop(
         elif evaluated >= max_hypotheses:
             user_content = (
                 f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated — TARGET REACHED]. {summary_block}\n\n"
-                "You have evaluated all required hypotheses. Write the final summary as the thought field using EXACTLY these markdown sections:\n\n"
-                "## Hypothesis Results\n"
-                "**S1 — Verdict**: one sentence with key evidence and statistics.\n"
-                "**H1 — Verdict**: one sentence with key evidence and statistics.\n"
-                "(one line per hypothesis)\n\n"
-                "## Key Genes\n"
-                "**GENE** (logFC X.X, adj_p Y.Y) — brief expression pattern or role.\n"
-                "(5–10 most important genes, one per line)\n\n"
-                "## Key Pathways / Mechanisms\n"
-                "**Pathway Name** (k=N, fold=X.X, adj_p=Y.Y) — biological meaning.\n"
-                "(top pathways identified, one per line)\n\n"
-                "## Biological Conclusion\n"
-                "2–4 sentences on the overall biology revealed by this analysis.\n\n"
-                "Then call DONE with this structured markdown as the thought."
+                "You have evaluated all required hypotheses. Write a comprehensive final summary as the thought field — "
+                "cover each hypothesis verdict with key evidence and statistics, the most important genes and their expression patterns, "
+                "key pathways and mechanisms identified, and an overall biological conclusion. Then call DONE."
             )
         else:
             user_content = f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\nWhat will you investigate?"

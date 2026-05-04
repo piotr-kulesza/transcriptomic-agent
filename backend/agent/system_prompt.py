@@ -234,4 +234,4 @@ STATISTICAL CAUTION:
 
 {strategy}
 
-END: {{"action":"DONE","params":{{}},"hypothesis_action":null,"thought":"## Hypothesis Results\\n**S1 — Confirmed/Rejected/Uncertain**: key evidence and statistics.\\n**H1 — Confirmed/Rejected/Uncertain**: key evidence and statistics.\\n(one line per hypothesis)\\n\\n## Key Genes\\n**GENE** (logFC X.X, adj_p Y.Y) — expression pattern and role.\\n(5–10 most important genes, one per line)\\n\\n## Key Pathways / Mechanisms\\n**Pathway Name** (k=N, fold=X.X, adj_p=Y.Y) — biological meaning.\\n(top pathways identified, one per line)\\n\\n## Biological Conclusion\\n2–4 sentences on the overall biology: what disease mechanism, tissue process, or molecular axis is revealed."}}"""
+END: {{"action":"DONE","params":{{}},"hypothesis_action":null,"thought":"Comprehensive summary of all findings — verdicts and key evidence for each hypothesis, most important genes and their patterns, key pathways and mechanisms, overall biological conclusion."}}"""
