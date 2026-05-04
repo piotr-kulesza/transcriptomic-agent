@@ -5,36 +5,38 @@ import LogEntry from "./components/LogEntry";
 import { setGroupMappings, uploadDegDataset } from "./api";
 
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body,#root{background:#09090e;width:100%;height:100%;overflow:hidden}
-  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#0d0d0d}::-webkit-scrollbar-thumb{background:#2a4a32}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
-  @keyframes si{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+  html,body,#root{background:#0d1117;width:100%;height:100%;overflow:hidden}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#161b22}::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  @keyframes si{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
   @keyframes dots{0%,100%{content:''}33%{content:'.'}66%{content:'..'}99%{content:'...'}}
   .thinking-indicator::after{content:'';animation:dots 1.2s steps(1) infinite}
   @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-  .spinner{width:28px;height:28px;border:2px solid #1a3a22;border-top-color:#3dcc7a;border-radius:50%;animation:spin 0.9s linear infinite}
-  .ent{animation:si .2s ease}
+  .spinner{width:16px;height:16px;border:2px solid #30363d;border-top-color:#388bfd;border-radius:50%;animation:spin 0.8s linear infinite}
+  .ent{animation:si .15s ease}
   .blink{animation:pulse 1.5s infinite}
-  .btn{background:transparent;border:1px solid #2a5a3a;color:#3dcc7a;font-family:inherit;font-size:14px;padding:9px 16px;cursor:pointer;letter-spacing:2px;text-transform:uppercase;transition:all .15s;width:100%}
-  .btn:hover{background:#0c1f16;border-color:#3dcc7a}.btn:disabled{opacity:.3;cursor:not-allowed}
-  .bsm{padding:5px 12px;width:auto;font-size:13px}.bdng{border-color:#4a2222;color:#cc5555}.bdng:hover{background:#1a0a0a;border-color:#cc5555}
-  .slot{border:1px solid #1e2e20;padding:14px;margin-bottom:10px;background:#0b0c0f}
-  .slot.ok{border-color:#223a28}
-  .uz{border:1px dashed #1e2e20;padding:12px;text-align:center;cursor:pointer;transition:all .15s;background:#0c0c10;display:block;margin-bottom:6px;font-size:14px;color:#3a6a4a}
-  .uz:hover,.uz.ok{border-color:#3dcc7a;background:#0b160f;color:#3dcc7a}
-  .tag{display:inline-block;padding:3px 8px;border-radius:2px;font-size:12px;font-weight:700;letter-spacing:1px}
-  input[type=text],select{background:#0b0c0f;border:1px solid #1e2e20;color:#ccc;padding:6px 9px;font-size:14px;font-family:inherit;width:100%}
-  input[type=number]{background:#0b0c0f;border:1px solid #1e2e20;color:#3dcc7a;padding:6px 9px;font-size:14px;font-family:inherit;width:100%}
-  .sec{font-size:12px;color:#3a7a4a;letter-spacing:2px;margin:16px 0 9px;font-weight:600}
+  .btn{background:#21262d;border:1px solid #30363d;color:#c9d1d9;font-family:inherit;font-size:13px;padding:7px 14px;cursor:pointer;transition:background .15s,border-color .15s;width:100%;border-radius:6px;font-weight:500}
+  .btn:hover{background:#2d333b;border-color:#8b949e}.btn:disabled{opacity:.4;cursor:not-allowed}
+  .bsm{padding:4px 10px;width:auto;font-size:12px}.bdng{border-color:#6e2020;color:#f85149;background:transparent}.bdng:hover{background:#3d0c0c;border-color:#f85149}
+  .slot{border:1px solid #21262d;padding:12px;margin-bottom:8px;background:#161b22;border-radius:6px}
+  .slot.ok{border-color:#2d5a3d}
+  .uz{border:1px dashed #30363d;padding:10px;text-align:center;cursor:pointer;transition:all .15s;background:#0d1117;display:block;margin-bottom:6px;font-size:13px;color:#8b949e;border-radius:4px}
+  .uz:hover,.uz.ok{border-color:#388bfd;background:#0d1f3c;color:#79c0ff}
+  .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+  input[type=text],select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px}
+  input[type=text]:focus,select:focus{outline:none;border-color:#388bfd}
+  input[type=number]{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px}
+  input[type=number]:focus{outline:none;border-color:#388bfd}
+  .sec{font-size:11px;color:#6e7681;letter-spacing:0.8px;margin:16px 0 8px;font-weight:600;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid #21262d}
 `;
 
 const VERDICT_STYLE = {
-  confirmed: { color: "#3dcc7a", icon: "✓" },
-  rejected:  { color: "#cc4444", icon: "✗" },
-  uncertain: { color: "#ccaa44", icon: "?" },
-  pending:   { color: "#446688", icon: "○" },
+  confirmed: { color: "#3fb950", icon: "✓" },
+  rejected:  { color: "#f85149", icon: "✗" },
+  uncertain: { color: "#d29922", icon: "?" },
+  pending:   { color: "#388bfd", icon: "○" },
 };
 
 export default function App() {
@@ -42,8 +44,8 @@ export default function App() {
     { id: 0, exprFile: null, metaFile: null, name: "Dataset 1" },
     { id: 1, exprFile: null, metaFile: null, name: "Dataset 2" },
   ]);
-  const [loaded,     setLoaded]     = useState([]);   // [{id, name, gene_count, sample_count, group_cols, group_col, groups}]
-  const [groupMap,   setGroupMap]   = useState({});   // {dataset_id → chosen group_col}
+  const [loaded,     setLoaded]     = useState([]);
+  const [groupMap,   setGroupMap]   = useState({});
   const [phase,      setPhase]      = useState("upload");
   const [log,        setLog]        = useState([]);
   const [hypotheses, setHypotheses] = useState([]);
@@ -52,11 +54,9 @@ export default function App() {
   const [agentMode,     setAgentMode]     = useState("reproduce");
   const [currentStatus, setCurrentStatus] = useState("");
   const [streamingText, setStreamingText] = useState("");
-  // mappingGroups: [{ canonical: string, aliases: Set<string> }]
   const [mappingGroups, setMappingGroups] = useState([]);
   const [mappingsOpen, setMappingsOpen] = useState(false);
-  // DEG upload state
-  const [degDatasets,  setDegDatasets]  = useState([]);  // confirmed uploads
+  const [degDatasets,  setDegDatasets]  = useState([]);
   const [degFile,      setDegFile]      = useState(null);
   const [degGroupA,    setDegGroupA]    = useState("");
   const [degGroupB,    setDegGroupB]    = useState("");
@@ -171,7 +171,6 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dataset_ids: loaded.map(d => d.id), group_cols: groupMap, free_steps: freeSteps, mode: agentMode }),
-        // mode: "reproduce" (temperature=0) | "explore" (temperature=1)
         signal: controller.signal,
       });
 
@@ -216,67 +215,70 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#09090e", fontFamily: "'JetBrains Mono','Fira Code',monospace", color: "#ddd" }}>
+    <div style={{ minHeight: "100vh", background: "#0d1117", fontFamily: "'Inter',system-ui,-apple-system,sans-serif", color: "#c9d1d9" }}>
       <style>{STYLES}</style>
 
-      <div style={{ borderBottom: "1px solid #1a2e1a", padding: "16px 28px", display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: phase === "running" ? "#3dcc7a" : "#223322", boxShadow: phase === "running" ? "0 0 10px #3dcc7a" : "none" }} className={phase === "running" ? "blink" : ""} />
-        <span style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: 3, color: "#3dcc7a" }}>TRANSCRIPTOMIC AGENT</span>
-        <span style={{ fontSize: 13, color: "#2a5a3a", letterSpacing: 2 }}>/ MULTI-DATASET · CROSS-COHORT</span>
-        {phase === "running" && !currentStatus && <span style={{ marginLeft: "auto", fontSize: 14, color: "#3a7a4a" }}>STEP {Math.min(step, freeSteps)}/{freeSteps}</span>}
+      {/* Header */}
+      <div style={{ borderBottom: "1px solid #21262d", padding: "11px 20px", display: "flex", alignItems: "center", gap: 10, background: "#161b22" }}>
+        <div style={{ width: 7, height: 7, borderRadius: "50%", background: phase === "running" ? "#3fb950" : "#30363d", flexShrink: 0 }} className={phase === "running" ? "blink" : ""} />
+        <span style={{ fontSize: 14, fontWeight: 600, color: "#e6edf3" }}>Transcriptomic Agent</span>
+        <span style={{ fontSize: 12, color: "#484f58" }}>Multi-dataset · Cross-cohort</span>
+        {phase === "running" && !currentStatus && (
+          <span style={{ marginLeft: "auto", fontSize: 12, color: "#8b949e" }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>
+        )}
       </div>
 
-      <div style={{ display: "flex", height: "calc(100vh - 58px)" }}>
+      <div style={{ display: "flex", height: "calc(100vh - 46px)" }}>
 
         {/* LEFT PANEL */}
-        <div style={{ width: 290, borderRight: "1px solid #1a2e1a", padding: "16px 14px", overflowY: "auto", flexShrink: 0 }}>
-          <div className="sec">// DATASETS</div>
+        <div style={{ width: 284, borderRight: "1px solid #21262d", padding: "12px", overflowY: "auto", flexShrink: 0, background: "#0d1117" }}>
+          <div className="sec">Datasets</div>
 
           {slots.map(slot => (
             <DatasetSlot key={slot.id} slot={slot} canRemove={slots.length > 1}
               onUpdate={(k, v) => updSlot(slot.id, k, v)} onRemove={() => removeSlot(slot.id)} />
           ))}
 
-          <button className="btn bsm" style={{ marginBottom: 8, width: "100%" }} onClick={addSlot}>+ ADD DATASET</button>
-          <button className="btn" style={{ marginBottom: 12 }} onClick={loadAll} disabled={!slots.some(s => s.exprFile && s.metaFile)}>
-            LOAD DATA
+          <button className="btn bsm" style={{ marginBottom: 6, width: "100%" }} onClick={addSlot}>+ Add dataset</button>
+          <button className="btn" style={{ marginBottom: 10 }} onClick={loadAll} disabled={!slots.some(s => s.exprFile && s.metaFile)}>
+            Load data
           </button>
 
           {/* DEG TABLE UPLOAD */}
-          <div className="sec">// DEG DATASETS</div>
+          <div className="sec">DEG Datasets</div>
           <div style={{ marginBottom: 10 }}>
             <label className="uz" style={{ marginBottom: 6, fontSize: 13 }}>
               {degFile ? degFile.name : "Upload DEG table (.csv)"}
               <input type="file" accept=".csv" style={{ display: "none" }} onChange={e => setDegFile(e.target.files[0] || null)} />
             </label>
             <input type="text" value={degGroupA} onChange={e => setDegGroupA(e.target.value)}
-              placeholder="groupA (e.g. endometriosis)" style={{ marginBottom: 5 }} />
+              placeholder="Group A" style={{ marginBottom: 5 }} />
             <input type="text" value={degGroupB} onChange={e => setDegGroupB(e.target.value)}
-              placeholder="groupB (e.g. normal)" style={{ marginBottom: 6 }} />
+              placeholder="Group B" style={{ marginBottom: 6 }} />
             <button className="btn bsm" style={{ width: "100%", marginBottom: 4 }}
               onClick={uploadDeg}
               disabled={!degFile || !degGroupA.trim() || !degGroupB.trim() || degUploading}>
-              {degUploading ? "UPLOADING..." : "UPLOAD DEG TABLE"}
+              {degUploading ? "Uploading..." : "Upload DEG table"}
             </button>
             {degStatus && (
-              <div style={{ fontSize: 12, marginBottom: 8, padding: "4px 6px",
-                color: degStatus.startsWith("Error") ? "#cc5555" : "#3dcc7a",
-                border: `1px solid ${degStatus.startsWith("Error") ? "#cc555533" : "#3dcc7a33"}`,
-                background: degStatus.startsWith("Error") ? "#1a0a0a" : "#0b160f" }}>
+              <div style={{ fontSize: 12, marginBottom: 8, padding: "5px 8px", borderRadius: 4,
+                color: degStatus.startsWith("Error") ? "#f85149" : "#3fb950",
+                background: degStatus.startsWith("Error") ? "#3d0c0c" : "#0d2714",
+                border: `1px solid ${degStatus.startsWith("Error") ? "#6e202033" : "#2d5a3d"}` }}>
                 {degStatus}
               </div>
             )}
             {degDatasets.map(d => (
               <div key={d.name} className="slot ok" style={{ marginBottom: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, color: "#4a9a6a", fontWeight: 600 }}>{d.name}</span>
+                  <span style={{ fontSize: 13, color: "#8b949e", fontWeight: 500 }}>{d.name}</span>
                   <button className="btn bsm bdng" style={{ padding: "2px 8px", fontSize: 11 }}
                     onClick={() => setDegDatasets(prev => prev.filter(x => x.name !== d.name))}>✕</button>
                 </div>
                 {(d.comparisons || []).map((c, i) => (
-                  <div key={i} style={{ fontSize: 12, color: "#3dcc7a", lineHeight: 1.8 }}>
-                    ▸ {c.groupA} <span style={{ color: "#2a5a3a" }}>vs</span> {c.groupB}
-                    <span style={{ color: "#2a6a3a", marginLeft: 6 }}>{c.n_genes} genes</span>
+                  <div key={i} style={{ fontSize: 12, color: "#6e9fd4", lineHeight: 1.8, fontFamily: "'JetBrains Mono',monospace" }}>
+                    {c.groupA} <span style={{ color: "#484f58" }}>vs</span> {c.groupB}
+                    <span style={{ color: "#6e7681", marginLeft: 6 }}>{c.n_genes} genes</span>
                   </div>
                 ))}
               </div>
@@ -284,10 +286,10 @@ export default function App() {
           </div>
 
           {(loaded.length > 0 || degDatasets.length > 0) && <>
-            <div className="sec">// GROUP COLUMNS</div>
+            <div className="sec">Group Columns</div>
             {loaded.map(ds => (
               <div key={ds.id} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 14, color: "#4a9a6a", marginBottom: 5, fontWeight: 600 }}>{ds.name}</div>
+                <div style={{ fontSize: 13, color: "#8b949e", marginBottom: 5, fontWeight: 500 }}>{ds.name}</div>
                 <select value={groupMap[ds.id] || ds.group_col} onChange={async e => {
                     const newCol = e.target.value;
                     setGroupMap(prev => ({ ...prev, [ds.id]: newCol }));
@@ -309,10 +311,10 @@ export default function App() {
                     </option>
                   ))}
                 </select>
-                <div style={{ fontSize: 13, color: "#3a6a4a", marginTop: 5, lineHeight: 2 }}>
-                  {ds.groups.map(g => <div key={g}>▸ {g}</div>)}
+                <div style={{ fontSize: 12, color: "#6e7681", marginTop: 5, lineHeight: 1.9, fontFamily: "'JetBrains Mono',monospace" }}>
+                  {ds.groups.map(g => <div key={g} style={{ paddingLeft: 2 }}>{g}</div>)}
                 </div>
-                <div style={{ fontSize: 13, color: "#2a5a3a", marginTop: 4 }}>{ds.gene_count} genes · {ds.sample_count} samples</div>
+                <div style={{ fontSize: 12, color: "#484f58", marginTop: 4 }}>{ds.gene_count} genes · {ds.sample_count} samples</div>
               </div>
             ))}
 
@@ -323,22 +325,22 @@ export default function App() {
                 <>
                   <div className="sec" style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", userSelect: "none" }}
                     onClick={() => setMappingsOpen(p => !p)}>
-                    <span>// GROUP MAPPINGS</span>
-                    <span style={{ color: "#3dcc7a" }}>{mappingsOpen ? "▾" : "▸"}</span>
+                    <span>Group Mappings</span>
+                    <span style={{ color: "#8b949e", fontSize: 13 }}>{mappingsOpen ? "▾" : "▸"}</span>
                   </div>
                   {mappingsOpen && (
                     <div style={{ marginBottom: 10 }}>
                       {mappingGroups.map((mg, idx) => (
-                        <div key={idx} style={{ marginBottom: 8, padding: "8px 10px", border: "1px solid #1e2e20", background: "#0b0c0f" }}>
+                        <div key={idx} style={{ marginBottom: 8, padding: "8px 10px", border: "1px solid #21262d", background: "#161b22", borderRadius: 6 }}>
                           <div style={{ display: "flex", gap: 5, marginBottom: 6 }}>
-                            <input type="text" value={mg.canonical} placeholder="canonical name"
+                            <input type="text" value={mg.canonical} placeholder="Canonical name"
                               onChange={e => updateMappingCanonical(idx, e.target.value)}
                               style={{ flex: 1 }} />
                             <button className="btn bsm bdng" onClick={() => removeMappingGroup(idx)}>✕</button>
                           </div>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 5 }}>
                             {allGroups.map(g => (
-                              <label key={g} style={{ fontSize: 12, color: mg.aliases.has(g) ? "#3dcc7a" : "#3a5a4a", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
+                              <label key={g} style={{ fontSize: 12, color: mg.aliases.has(g) ? "#388bfd" : "#6e7681", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                                 <input type="checkbox" checked={mg.aliases.has(g)}
                                   onChange={e => toggleAlias(idx, g, e.target.checked)} />
                                 {g}
@@ -346,10 +348,10 @@ export default function App() {
                             ))}
                           </div>
                           {mg.canonical && (
-                            <div style={{ fontSize: 11, color: "#2a5a3a", lineHeight: 1.6 }}>
+                            <div style={{ fontSize: 11, color: "#6e7681", lineHeight: 1.6, fontFamily: "'JetBrains Mono',monospace" }}>
                               "{mg.canonical}" ← {allGroups.map(g => (
-                                <span key={g} style={{ marginRight: 4, color: mg.aliases.has(g) ? "#3dcc7a" : "#2a4a3a" }}>
-                                  [{g} {mg.aliases.has(g) ? "✓" : "✗"}]
+                                <span key={g} style={{ marginRight: 6, color: mg.aliases.has(g) ? "#388bfd" : "#30363d" }}>
+                                  {g} {mg.aliases.has(g) ? "✓" : "✗"}
                                 </span>
                               ))}
                             </div>
@@ -357,7 +359,7 @@ export default function App() {
                         </div>
                       ))}
                       <button className="btn bsm" style={{ width: "100%", marginBottom: 6 }} onClick={addMappingGroup}>
-                        + ADD MAPPING GROUP
+                        + Add mapping group
                       </button>
                     </div>
                   )}
@@ -365,28 +367,41 @@ export default function App() {
               );
             })()}
 
-            <div className="sec">// MODE</div>
-            <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+            <div className="sec">Mode</div>
+            <div style={{ display: "flex", background: "#0d1117", borderRadius: 6, border: "1px solid #30363d", padding: 3, marginBottom: 12, gap: 2 }}>
               {[
-                { key: "reproduce", label: "REPRODUCE", sub: "deterministic" },
-                { key: "explore",   label: "EXPLORE",   sub: "creative" },
+                { key: "reproduce", label: "Reproduce", sub: "deterministic" },
+                { key: "explore",   label: "Explore",   sub: "creative" },
               ].map(({ key, label, sub }) => (
-                <button key={key} className="btn bsm" onClick={() => setAgentMode(key)}
-                  style={{ flex: 1, borderColor: agentMode === key ? "#3dcc7a" : "#2a5a3a", color: agentMode === key ? "#3dcc7a" : "#2a5a3a", background: agentMode === key ? "#0b160f" : "transparent", paddingBottom: 8 }}>
+                <button key={key} onClick={() => setAgentMode(key)}
+                  style={{
+                    flex: 1, background: agentMode === key ? "#21262d" : "transparent",
+                    border: agentMode === key ? "1px solid #30363d" : "1px solid transparent",
+                    color: agentMode === key ? "#c9d1d9" : "#6e7681",
+                    padding: "5px 8px", cursor: "pointer", borderRadius: 4, transition: "all .15s",
+                    fontFamily: "inherit", fontSize: 12, fontWeight: agentMode === key ? 500 : 400,
+                  }}>
                   {label}
-                  <div style={{ fontSize: 9, color: "#1a3a22", letterSpacing: 1, marginTop: 3 }}>{sub}</div>
+                  <div style={{ fontSize: 10, color: agentMode === key ? "#8b949e" : "#484f58", marginTop: 1 }}>{sub}</div>
                 </button>
               ))}
             </div>
 
-            <div className="sec">// STEPS</div>
+            <div className="sec">Steps</div>
             <input type="number" value={freeSteps} min={1} max={30}
               onChange={e => setFreeSteps(parseInt(e.target.value))}
               style={{ marginBottom: 12 }} />
 
-            <button className="btn" style={{ background: phase === "running" ? "#080e0a" : "transparent" }}
+            <button
+              style={{
+                width: "100%", padding: "8px 14px", border: "1px solid transparent", borderRadius: 6,
+                background: phase === "running" ? "#21262d" : "#1f6feb",
+                borderColor: phase === "running" ? "#30363d" : "transparent",
+                color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+                cursor: "pointer", transition: "background .15s",
+              }}
               onClick={phase === "running" ? () => abortRef.current?.abort() : runAgent}>
-              {phase === "running" ? "■ STOP" : "▶ START AGENT"}
+              {phase === "running" ? "Stop" : "Start Agent"}
             </button>
           </>}
         </div>
@@ -396,37 +411,36 @@ export default function App() {
 
           {/* sticky status bar */}
           {currentStatus && (
-            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "10px 28px", borderBottom: "1px solid #1a2e1a", background: "#0b0f0b" }}>
+            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "8px 24px", borderBottom: "1px solid #21262d", background: "#161b22" }}>
               <div className="spinner" />
-              <span className="thinking-indicator" style={{ fontSize: 13, color: "#3dcc7a", letterSpacing: 1 }}>{currentStatus}</span>
-              {step > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: "#2a5a3a" }}>STEP {Math.min(step, freeSteps)}/{freeSteps}</span>}
+              <span className="thinking-indicator" style={{ fontSize: 13, color: "#c9d1d9" }}>{currentStatus}</span>
+              {step > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: "#6e7681" }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>}
             </div>
           )}
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "22px 28px" }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
             {log.length === 0 && !currentStatus && (
               <div style={{ textAlign: "center", marginTop: 100 }}>
-                <div style={{ fontSize: 36, opacity: .1, marginBottom: 14 }}>⬡</div>
-                <div style={{ fontSize: 16, color: "#2a5a3a" }}>Load datasets and start the agent</div>
-                <div style={{ fontSize: 13, color: "#1a3a22", marginTop: 8 }}>Backend: <code style={{color:"#2a5a3a"}}>uvicorn backend.main:app --reload</code></div>
+                <div style={{ fontSize: 32, opacity: .12, marginBottom: 14, color: "#8b949e" }}>◈</div>
+                <div style={{ fontSize: 15, color: "#6e7681", fontWeight: 500 }}>Load datasets and start the agent</div>
+                <div style={{ fontSize: 13, color: "#484f58", marginTop: 8 }}>Backend: <code style={{ color: "#8b949e", fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }}>uvicorn backend.main:app --reload</code></div>
               </div>
             )}
             {log.length === 0 && currentStatus && (
               <div style={{ textAlign: "center", marginTop: 120 }}>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-                  <div style={{ width: 48, height: 48, border: "2px solid #1a3a22", borderTopColor: "#3dcc7a", borderRadius: "50%", animation: "spin 0.9s linear infinite" }} />
+                  <div style={{ width: 36, height: 36, border: "2px solid #21262d", borderTopColor: "#388bfd", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                 </div>
-                <div style={{ fontSize: 15, color: "#3a7a4a", letterSpacing: 1 }}>{currentStatus}</div>
-                <div style={{ fontSize: 12, color: "#1a3a22", marginTop: 8 }}>This may take a few seconds...</div>
+                <div style={{ fontSize: 14, color: "#8b949e" }}>{currentStatus}</div>
+                <div style={{ fontSize: 12, color: "#484f58", marginTop: 8 }}>This may take a few seconds...</div>
               </div>
             )}
             {log.map(e => <LogEntry key={e.id} entry={e} />)}
             {streamingText && (
-              <div className="ent" style={{ marginBottom: 12, borderLeft: "3px solid #224a2a", paddingLeft: 14 }}>
+              <div className="ent" style={{ marginBottom: 12, borderLeft: "2px solid #30363d", paddingLeft: 14 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
-                  <span style={{ color: "#224a2a", fontSize: 15, marginTop: 2, flexShrink: 0 }}>◆</span>
-                  <div style={{ fontSize: 14, color: "#5aaa7a", lineHeight: 1.7 }}>
-                    {streamingText}<span className="blink">▋</span>
+                  <div style={{ fontSize: 14, color: "#c9d1d9", lineHeight: 1.7 }}>
+                    {streamingText}<span className="blink" style={{ color: "#388bfd" }}>▋</span>
                   </div>
                 </div>
               </div>
@@ -437,29 +451,28 @@ export default function App() {
 
         {/* HYPOTHESIS PANEL */}
         {(phase === "running" || hypotheses.length > 0) && (
-          <div style={{ width: 270, borderLeft: "1px solid #1a2e1a", padding: "16px 14px", overflowY: "auto", flexShrink: 0, background: "#09090e" }}>
-            <div className="sec">// HYPOTHESES</div>
-            {hypotheses.length === 0 && <div style={{ fontSize: 13, color: "#2a4a2a" }}>Agent is formulating hypotheses...</div>}
+          <div style={{ width: 272, borderLeft: "1px solid #21262d", padding: "12px", overflowY: "auto", flexShrink: 0, background: "#0d1117" }}>
+            <div className="sec">Hypotheses</div>
+            {hypotheses.length === 0 && <div style={{ fontSize: 13, color: "#484f58" }}>Agent is formulating hypotheses...</div>}
             {hypotheses.map(h => {
               const vs = VERDICT_STYLE[h.status] || VERDICT_STYLE.pending;
               return (
-                <div key={h.id} style={{ marginBottom: 12, padding: "10px 11px", background: "#0b0c0f", border: `1px solid ${vs.color}33`, borderRadius: 3 }}>
+                <div key={h.id} style={{ marginBottom: 10, padding: "10px 12px", background: "#161b22", border: `1px solid #21262d`, borderRadius: 6, borderLeft: `3px solid ${vs.color}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                    <span className="tag" style={{ background: `${vs.color}22`, color: vs.color, border: `1px solid ${vs.color}44` }}>{h.id}</span>
-                    <span style={{ fontSize: 14, color: vs.color }}>{vs.icon}</span>
-                    <span style={{ fontSize: 12, color: vs.color, letterSpacing: 1, opacity: 0.8 }}>{h.status.toUpperCase()}</span>
+                    <span className="tag" style={{ background: `${vs.color}18`, color: vs.color }}>{h.id}</span>
+                    <span style={{ fontSize: 12, color: vs.color }}>{vs.icon} {h.status}</span>
                   </div>
-                  <div style={{ fontSize: 13, color: "#7799bb", lineHeight: 1.7 }}>{h.text}</div>
+                  <div style={{ fontSize: 13, color: "#c9d1d9", lineHeight: 1.6 }}>{h.text}</div>
                   {h.evidence.length > 0 && (
-                    <div style={{ marginTop: 7, borderTop: "1px solid #1a2a3a", paddingTop: 7 }}>
+                    <div style={{ marginTop: 8, borderTop: "1px solid #21262d", paddingTop: 8 }}>
                       {h.evidence.map((ev, i) => (
-                        <div key={i} style={{ fontSize: 12, color: "#4a6677", lineHeight: 1.6, marginBottom: 4 }}>
-                          <span style={{ color: "#3a5a6a" }}>krok {ev.step} [{ev.action}]</span> {ev.reasoning}
+                        <div key={i} style={{ fontSize: 12, color: "#6e7681", lineHeight: 1.6, marginBottom: 4 }}>
+                          <span style={{ color: "#8b949e" }}>step {ev.step} [{ev.action}]</span> {ev.reasoning}
                           {ev.key_stats && Object.keys(ev.key_stats).length > 0 && (
-                            <div style={{ marginTop: 2, paddingLeft: 8, borderLeft: "2px solid #1a3a2a" }}>
+                            <div style={{ marginTop: 2, paddingLeft: 8, borderLeft: "2px solid #21262d", fontFamily: "'JetBrains Mono',monospace" }}>
                               {Object.entries(ev.key_stats).map(([gene, s]) => (
-                                <span key={gene} style={{ display: "inline-block", marginRight: 10, color: "#3a6a4a", fontSize: 11 }}>
-                                  <b style={{ color: "#4a8a5a" }}>{gene}</b>{": "}
+                                <span key={gene} style={{ display: "inline-block", marginRight: 10, color: "#6e7681", fontSize: 11 }}>
+                                  <b style={{ color: "#8b949e" }}>{gene}</b>{": "}
                                   {Object.entries(s).filter(([, v]) => v != null).map(([k, v]) =>
                                     `${k}=${typeof v === "number" ? (Math.abs(v) < 0.001 ? v.toExponential(2) : v.toPrecision(3)) : Array.isArray(v) ? v.join(",") : v}`
                                   ).join("  ")}
