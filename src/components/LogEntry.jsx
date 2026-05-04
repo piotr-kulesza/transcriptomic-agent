@@ -42,7 +42,7 @@ export default function LogEntry({ entry }) {
           {entry.type === "thinking" && (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
-              <span style={{ fontSize: 11, color: "#2dd4bf", letterSpacing: 0.8, whiteSpace: "nowrap", fontWeight: 600, opacity: 0.8 }}>
+              <span style={{ fontSize: 11, color: "#6C5CE7", letterSpacing: 0.8, whiteSpace: "nowrap", fontWeight: 600, opacity: 0.8 }}>
                 {entry.text.replace("Agent thinking... ", "").toUpperCase()}
               </span>
               <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
@@ -118,7 +118,7 @@ export default function LogEntry({ entry }) {
               border: "1px solid #21262d",
               borderRadius: 4,
               fontSize: 12,
-              color: entry.mode === "reproduce" ? "#2dd4bf" : "#c084fc",
+              color: entry.mode === "reproduce" ? "#6C5CE7" : "#c084fc",
               marginBottom: 8,
             }}>
               {entry.mode === "reproduce"

@@ -8,30 +8,30 @@ const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
   html,body,#root{background:#0d1117;width:100%;height:100%;overflow:hidden}
-  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#161b22}::-webkit-scrollbar-thumb{background:#2dd4bf33;border-radius:3px}
-  ::-webkit-scrollbar-thumb:hover{background:#2dd4bf55}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#161b22}::-webkit-scrollbar-thumb{background:#6C5CE733;border-radius:3px}
+  ::-webkit-scrollbar-thumb:hover{background:#6C5CE755}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   @keyframes si{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
   @keyframes dots{0%,100%{content:''}33%{content:'.'}66%{content:'..'}99%{content:'...'}}
   .thinking-indicator::after{content:'';animation:dots 1.2s steps(1) infinite}
   @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-  .spinner{width:16px;height:16px;border:2px solid #1e3a38;border-top-color:#2dd4bf;border-radius:50%;animation:spin 0.8s linear infinite}
+  .spinner{width:16px;height:16px;border:2px solid #1e1a35;border-top-color:#6C5CE7;border-radius:50%;animation:spin 0.8s linear infinite}
   .ent{animation:si .15s ease}
   .blink{animation:pulse 1.2s infinite}
   .btn{background:#161b22;border:1px solid #30363d;color:#c9d1d9;font-family:inherit;font-size:13px;padding:7px 14px;cursor:pointer;transition:background .15s,border-color .15s;width:100%;border-radius:6px;font-weight:500}
   .btn:hover{background:#21262d;border-color:#8b949e}.btn:disabled{opacity:.4;cursor:not-allowed}
   .bsm{padding:4px 10px;width:auto;font-size:12px}.bdng{border-color:#6e2020;color:#f87171;background:transparent}.bdng:hover{background:#2d0c0c;border-color:#f87171}
   .slot{border:1px solid #21262d;padding:12px;margin-bottom:8px;background:#161b22;border-radius:6px;transition:border-color .15s}
-  .slot.ok{border-color:#2dd4bf33}
+  .slot.ok{border-color:#6C5CE733}
   .uz{border:1px dashed #30363d;padding:10px;text-align:center;cursor:pointer;transition:all .15s;background:#0d1117;display:block;margin-bottom:6px;font-size:13px;color:#64748b;border-radius:4px}
-  .uz:hover{border-color:#2dd4bf88;background:#0a2a28;color:#5eead4}
-  .uz.ok{border-color:#2dd4bf44;background:#0a1f1e;color:#2dd4bf}
+  .uz:hover{border-color:#6C5CE788;background:#1a1535;color:#b8b1f7}
+  .uz.ok{border-color:#6C5CE744;background:#130f2a;color:#6C5CE7}
   .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
   input[type=text],select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px;transition:border-color .15s}
-  input[type=text]:focus,select:focus{outline:none;border-color:#2dd4bf66}
+  input[type=text]:focus,select:focus{outline:none;border-color:#6C5CE766}
   input[type=number]{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;border-radius:4px;transition:border-color .15s}
-  input[type=number]:focus{outline:none;border-color:#2dd4bf66}
-  .sec{font-size:10px;color:#2dd4bf;letter-spacing:1px;margin:16px 0 8px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  input[type=number]:focus{outline:none;border-color:#6C5CE766}
+  .sec{font-size:10px;color:#6C5CE7;letter-spacing:1px;margin:16px 0 8px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:8px}
   .sec::after{content:'';flex:1;height:1px;background:#21262d}
 `;
 
@@ -223,11 +223,11 @@ export default function App() {
 
       {/* Header */}
       <div style={{ borderBottom: "1px solid #21262d", padding: "11px 20px", display: "flex", alignItems: "center", gap: 12, background: "#161b22" }}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: phase === "running" ? "#2dd4bf" : "#21262d", boxShadow: phase === "running" ? "0 0 8px #2dd4bf88" : "none", flexShrink: 0, transition: "all .3s" }} className={phase === "running" ? "blink" : ""} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#2dd4bf", letterSpacing: 0.3 }}>Transcriptomic Agent</span>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: phase === "running" ? "#6C5CE7" : "#21262d", boxShadow: phase === "running" ? "0 0 8px #6C5CE788" : "none", flexShrink: 0, transition: "all .3s" }} className={phase === "running" ? "blink" : ""} />
+        <span style={{ fontSize: 14, fontWeight: 600, color: "#6C5CE7", letterSpacing: 0.3 }}>Transcriptomic Agent</span>
         <span style={{ fontSize: 12, color: "#334155", paddingLeft: 4 }}>Multi-dataset · Cross-cohort</span>
         {phase === "running" && !currentStatus && (
-          <span style={{ marginLeft: "auto", fontSize: 12, color: "#2dd4bf", opacity: 0.7 }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>
+          <span style={{ marginLeft: "auto", fontSize: 12, color: "#6C5CE7", opacity: 0.7 }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>
         )}
       </div>
 
@@ -243,7 +243,7 @@ export default function App() {
           ))}
 
           <button className="btn bsm" style={{ marginBottom: 6, width: "100%" }} onClick={addSlot}>+ Add dataset</button>
-          <button className="btn" style={{ marginBottom: 10, borderColor: "#2dd4bf33", color: "#2dd4bf" }} onClick={loadAll} disabled={!slots.some(s => s.exprFile && s.metaFile)}>
+          <button className="btn" style={{ marginBottom: 10, borderColor: "#6C5CE733", color: "#6C5CE7" }} onClick={loadAll} disabled={!slots.some(s => s.exprFile && s.metaFile)}>
             Load data
           </button>
 
@@ -274,7 +274,7 @@ export default function App() {
             {degDatasets.map(d => (
               <div key={d.name} className="slot ok" style={{ marginBottom: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, color: "#2dd4bf", fontWeight: 500 }}>{d.name}</span>
+                  <span style={{ fontSize: 13, color: "#6C5CE7", fontWeight: 500 }}>{d.name}</span>
                   <button className="btn bsm bdng" style={{ padding: "2px 8px", fontSize: 11 }}
                     onClick={() => setDegDatasets(prev => prev.filter(x => x.name !== d.name))}>✕</button>
                 </div>
@@ -329,7 +329,7 @@ export default function App() {
                   <div className="sec" style={{ cursor: "pointer", userSelect: "none" }}
                     onClick={() => setMappingsOpen(p => !p)}>
                     <span>Group Mappings</span>
-                    <span style={{ color: "#2dd4bf", fontSize: 12, marginLeft: -4 }}>{mappingsOpen ? "▾" : "▸"}</span>
+                    <span style={{ color: "#6C5CE7", fontSize: 12, marginLeft: -4 }}>{mappingsOpen ? "▾" : "▸"}</span>
                   </div>
                   {mappingsOpen && (
                     <div style={{ marginBottom: 10 }}>
@@ -343,7 +343,7 @@ export default function App() {
                           </div>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 5 }}>
                             {allGroups.map(g => (
-                              <label key={g} style={{ fontSize: 12, color: mg.aliases.has(g) ? "#2dd4bf" : "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                              <label key={g} style={{ fontSize: 12, color: mg.aliases.has(g) ? "#6C5CE7" : "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                                 <input type="checkbox" checked={mg.aliases.has(g)}
                                   onChange={e => toggleAlias(idx, g, e.target.checked)} />
                                 {g}
@@ -353,7 +353,7 @@ export default function App() {
                           {mg.canonical && (
                             <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.6, fontFamily: "'JetBrains Mono',monospace" }}>
                               "{mg.canonical}" ← {allGroups.map(g => (
-                                <span key={g} style={{ marginRight: 6, color: mg.aliases.has(g) ? "#2dd4bf" : "#334155" }}>
+                                <span key={g} style={{ marginRight: 6, color: mg.aliases.has(g) ? "#6C5CE7" : "#334155" }}>
                                   {g} {mg.aliases.has(g) ? "✓" : "✗"}
                                 </span>
                               ))}
@@ -379,14 +379,14 @@ export default function App() {
                 <button key={key} onClick={() => setAgentMode(key)}
                   style={{
                     flex: 1,
-                    background: agentMode === key ? "#0a2a28" : "transparent",
-                    border: agentMode === key ? "1px solid #2dd4bf33" : "1px solid transparent",
-                    color: agentMode === key ? "#2dd4bf" : "#64748b",
+                    background: agentMode === key ? "#1a1535" : "transparent",
+                    border: agentMode === key ? "1px solid #6C5CE733" : "1px solid transparent",
+                    color: agentMode === key ? "#6C5CE7" : "#64748b",
                     padding: "5px 8px", cursor: "pointer", borderRadius: 4, transition: "all .15s",
                     fontFamily: "inherit", fontSize: 12, fontWeight: agentMode === key ? 500 : 400,
                   }}>
                   {label}
-                  <div style={{ fontSize: 10, color: agentMode === key ? "#5eead4" : "#334155", marginTop: 1 }}>{sub}</div>
+                  <div style={{ fontSize: 10, color: agentMode === key ? "#b8b1f7" : "#334155", marginTop: 1 }}>{sub}</div>
                 </button>
               ))}
             </div>
@@ -399,14 +399,14 @@ export default function App() {
             <button
               style={{
                 width: "100%", padding: "9px 14px", border: "1px solid transparent", borderRadius: 6,
-                background: phase === "running" ? "#161b22" : "#0d4a44",
-                borderColor: phase === "running" ? "#30363d" : "#2dd4bf44",
-                color: phase === "running" ? "#94a3b8" : "#2dd4bf",
+                background: phase === "running" ? "#161b22" : "#2d1f6e",
+                borderColor: phase === "running" ? "#30363d" : "#6C5CE744",
+                color: phase === "running" ? "#94a3b8" : "#6C5CE7",
                 fontFamily: "inherit", fontSize: 13, fontWeight: 600,
                 cursor: "pointer", transition: "all .15s",
               }}
-              onMouseEnter={e => { if (phase !== "running") { e.target.style.background = "#0a3a36"; e.target.style.borderColor = "#2dd4bf88"; } }}
-              onMouseLeave={e => { if (phase !== "running") { e.target.style.background = "#0d4a44"; e.target.style.borderColor = "#2dd4bf44"; } }}
+              onMouseEnter={e => { if (phase !== "running") { e.target.style.background = "#251a5a"; e.target.style.borderColor = "#6C5CE788"; } }}
+              onMouseLeave={e => { if (phase !== "running") { e.target.style.background = "#2d1f6e"; e.target.style.borderColor = "#6C5CE744"; } }}
               onClick={phase === "running" ? () => abortRef.current?.abort() : runAgent}>
               {phase === "running" ? "Stop" : "Start Agent"}
             </button>
@@ -420,7 +420,7 @@ export default function App() {
           {currentStatus && (
             <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "8px 24px", borderBottom: "1px solid #21262d", background: "#161b22" }}>
               <div className="spinner" />
-              <span className="thinking-indicator" style={{ fontSize: 13, color: "#2dd4bf" }}>{currentStatus}</span>
+              <span className="thinking-indicator" style={{ fontSize: 13, color: "#6C5CE7" }}>{currentStatus}</span>
               {step > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>Step {Math.min(step, freeSteps)}/{freeSteps}</span>}
             </div>
           )}
@@ -428,7 +428,7 @@ export default function App() {
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
             {log.length === 0 && !currentStatus && (
               <div style={{ textAlign: "center", marginTop: 100 }}>
-                <div style={{ fontSize: 28, opacity: .2, marginBottom: 14, color: "#2dd4bf" }}>◈</div>
+                <div style={{ fontSize: 28, opacity: .2, marginBottom: 14, color: "#6C5CE7" }}>◈</div>
                 <div style={{ fontSize: 15, color: "#4b5563", fontWeight: 500 }}>Load datasets and start the agent</div>
                 <div style={{ fontSize: 13, color: "#374151", marginTop: 8 }}>Backend: <code style={{ color: "#64748b", fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }}>uvicorn backend.main:app --reload</code></div>
               </div>
@@ -436,17 +436,17 @@ export default function App() {
             {log.length === 0 && currentStatus && (
               <div style={{ textAlign: "center", marginTop: 120 }}>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-                  <div style={{ width: 36, height: 36, border: "2px solid #1e3a38", borderTopColor: "#2dd4bf", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                  <div style={{ width: 36, height: 36, border: "2px solid #1e1a35", borderTopColor: "#6C5CE7", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                 </div>
-                <div style={{ fontSize: 14, color: "#2dd4bf", opacity: 0.8 }}>{currentStatus}</div>
+                <div style={{ fontSize: 14, color: "#6C5CE7", opacity: 0.8 }}>{currentStatus}</div>
                 <div style={{ fontSize: 12, color: "#374151", marginTop: 8 }}>This may take a few seconds...</div>
               </div>
             )}
             {log.map(e => <LogEntry key={e.id} entry={e} />)}
             {streamingText && (
-              <div className="ent" style={{ marginBottom: 12, borderLeft: "2px solid #2dd4bf44", paddingLeft: 14 }}>
+              <div className="ent" style={{ marginBottom: 12, borderLeft: "2px solid #6C5CE744", paddingLeft: 14 }}>
                 <div style={{ fontSize: 14, color: "#c9d1d9", lineHeight: 1.7 }}>
-                  {streamingText}<span className="blink" style={{ color: "#2dd4bf" }}>▋</span>
+                  {streamingText}<span className="blink" style={{ color: "#6C5CE7" }}>▋</span>
                 </div>
               </div>
             )}
