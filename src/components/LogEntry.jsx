@@ -196,13 +196,9 @@ export default function LogEntry({ entry, theme: t }) {
           )}
 
           {entry.type === "done" && !entry.exhausted && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-                <div style={{ flex: 1, height: 1, background: "#4ade8040" }} />
-                <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                  ✓ Analysis Complete
-                </span>
-                <div style={{ flex: 1, height: 1, background: "#4ade8040" }} />
+            <div style={{ marginTop: 8, padding: "16px 20px", background: "#4ade800d", border: "1px solid #4ade8030", borderLeft: "3px solid #4ade80", borderRadius: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>✓ Analysis Complete</span>
               </div>
               {renderSummary(entry.text, t)}
             </div>
