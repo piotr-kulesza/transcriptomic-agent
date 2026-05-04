@@ -78,6 +78,94 @@ function renderSummary(text, t) {
   return elements;
 }
 
+function ResultTable({ rows, t }) {
+  if (!rows || rows.length === 0) return null;
+  const keys = Object.keys(rows[0]);
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}>
+      <thead>
+        <tr>
+          {keys.map(k => (
+            <th key={k} style={{ textAlign: "left", padding: "3px 8px", color: t.textMuted, fontWeight: 600, borderBottom: `1px solid ${t.border}`, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>
+              {k}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : `${t.border}60` }}>
+            {keys.map(k => (
+              <td key={k} style={{ padding: "3px 8px", color: t.textSecondary, whiteSpace: "nowrap" }}>
+                {String(row[k] ?? "")}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function renderResult(result, t) {
+  if (!result || typeof result !== "object") {
+    return <pre style={{ fontSize: 11, color: t.textMuted, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "pre-wrap", margin: 0 }}>{String(result)}</pre>;
+  }
+  if (result.error) {
+    return <span style={{ fontSize: 12, color: "#f87171" }}>{result.error}</span>;
+  }
+
+  const scalars = [];
+  const tables  = [];
+
+  for (const [key, value] of Object.entries(result)) {
+    if (value === null || value === undefined) continue;
+    if (Array.isArray(value)) {
+      if (value.length === 0) continue;
+      if (typeof value[0] === "object" && value[0] !== null) {
+        tables.push([key, value]);
+      } else {
+        // array of primitives — show count + preview, skip huge gene lists
+        const preview = value.length > 8 ? `${value.slice(0, 8).join(", ")} … (${value.length} total)` : value.join(", ");
+        scalars.push([key, preview]);
+      }
+    } else if (typeof value !== "object") {
+      scalars.push([key, value]);
+    }
+  }
+
+  // If nothing structured, fall back to JSON
+  if (scalars.length === 0 && tables.length === 0) {
+    return (
+      <pre style={{ fontSize: 11, color: t.textMuted, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "pre-wrap", margin: 0 }}>
+        {JSON.stringify(result, null, 2).slice(0, 4000)}
+      </pre>
+    );
+  }
+
+  return (
+    <div>
+      {scalars.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 20px", marginBottom: tables.length > 0 ? 10 : 0 }}>
+          {scalars.map(([k, v]) => (
+            <span key={k} style={{ fontSize: 11, color: t.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>
+              <span style={{ color: t.textSecondary }}>{k}:</span> {String(v)}
+            </span>
+          ))}
+        </div>
+      )}
+      {tables.map(([key, rows]) => (
+        <div key={key} style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 10, color: t.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>{key}</div>
+          <div style={{ overflowX: "auto" }}>
+            <ResultTable rows={rows} t={t} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function renderThought(text, t) {
   const parts = text.split(/(```[\s\S]*?```)/g);
   return parts.map((part, i) => {
@@ -122,8 +210,8 @@ export default function LogEntry({ entry, theme: t }) {
 
           {entry.type === "code" && (
             <div style={{ paddingLeft: 16, borderLeft: `2px solid ${t.border}` }}>
-              <div style={{ fontSize: 10, color: t.codeText, marginBottom: 6, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>Code</div>
-              <pre style={{ padding: "10px 12px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 12, color: t.codeText, overflowX: "auto", maxHeight: 180, lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
+              <div style={{ fontSize: 10, color: t.codeText, marginBottom: 4, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>Code</div>
+              <pre style={{ padding: "7px 10px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 10, color: t.codeText, overflowX: "auto", maxHeight: 120, overflowY: "auto", lineHeight: 1.5, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
                 {entry.code}
               </pre>
             </div>
@@ -137,9 +225,9 @@ export default function LogEntry({ entry, theme: t }) {
                 </span>
                 <span style={{ fontSize: 13, color: t.textSecondary, flex: 1, lineHeight: 1.5 }}>{entry.summary}</span>
               </div>
-              <pre style={{ margin: 0, padding: "10px 12px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 12, color: t.textMuted, overflowX: "auto", maxHeight: 400, overflowY: "auto", lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
-                {JSON.stringify(entry.result, null, 2).slice(0, 6000)}
-              </pre>
+              <div style={{ padding: "8px 10px", background: t.appBg, border: `1px solid ${t.border}`, borderRadius: 6, maxHeight: 320, overflowY: "auto" }}>
+                {renderResult(entry.result, t)}
+              </div>
             </div>
           )}
 
