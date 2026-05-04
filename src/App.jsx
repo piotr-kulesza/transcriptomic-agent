@@ -108,7 +108,6 @@ export default function App() {
 
   const [slots, setSlots] = useState([
     { id: 0, exprFile: null, metaFile: null, name: "Dataset 1" },
-    { id: 1, exprFile: null, metaFile: null, name: "Dataset 2" },
   ]);
   const [loaded,        setLoaded]        = useState([]);
   const [groupMap,      setGroupMap]      = useState({});
