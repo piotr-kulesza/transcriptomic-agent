@@ -410,7 +410,11 @@ export default function App() {
 
             {/* GROUP MAPPINGS */}
             {(() => {
-              const degGroups = degDatasets.flatMap(d => (d.comparisons || []).flatMap(c => [c.groupA, c.groupB]));
+              const degGroups = degDatasets.flatMap(d => {
+                const fromComparisons = (d.comparisons || []).flatMap(c => [c.groupA, c.groupB]);
+                const topLevel = [d.groupA, d.groupB].filter(Boolean);
+                return [...fromComparisons, ...topLevel];
+              });
               const allGroups = [...new Set([...loaded.flatMap(ds => ds.groups), ...degGroups])];
               return (
                 <>
