@@ -272,7 +272,7 @@ export default function LogEntry({ entry, theme: t }) {
               <div style={{ fontSize: 10, color: "#60a5fa", letterSpacing: 1.5, marginBottom: 8, fontWeight: 700, textTransform: "uppercase" }}>Pre-Analysis</div>
               {entry.summary
                 ? <div style={{ fontSize: 12, color: t.textSecondary, lineHeight: 1.75, whiteSpace: "pre-line" }}>{entry.summary}</div>
-                : <div style={{ fontSize: 12, color: t.textMuted }}>No common groups across datasets — starting without seed hypotheses.</div>
+                : <div style={{ fontSize: 12, color: t.textMuted }}>Pre-analysis produced no results — check that datasets are log-transformed and group columns are set correctly.</div>
               }
             </div>
           )}

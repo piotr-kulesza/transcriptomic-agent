@@ -32,9 +32,9 @@ def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], s
     # Convert list → dict keyed by dataset name for iteration
     ds_dict = {ds["name"]: ds for ds in datasets}
 
-    try:
-        # ── 1. Per-dataset differential expression (MWU + BH) ────────────────
-        for ds_name, ds in ds_dict.items():
+    # ── 1. Per-dataset differential expression (MWU + BH) ────────────────
+    for ds_name, ds in ds_dict.items():
+        try:
             expr = ds["expr"]
             meta = ds["meta"]
             gc = ds["group_col"]
@@ -51,8 +51,11 @@ def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], s
                     )
                     continue
 
-                # Verify data is log-transformed (log2 scale values typically 0–20)
-                assert expr.values.max() < 25, "Data may not be log-transformed"
+                if expr.values.max() >= 25:
+                    summary_lines.append(
+                        f"  {ds_name}: skipped — data may not be log-transformed (max={expr.values.max():.1f})"
+                    )
+                    break
 
                 # MWU per gene
                 results = []
@@ -139,19 +142,26 @@ def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], s
                     })
                     seed_id += 1
 
-        # ── 2. Cross-dataset DE if >= 2 datasets ─────────────────────────────
+        except Exception as e:
+            summary_lines.append(f"  {ds_name}: seeder error — {e}")
+
+    # ── 2. Cross-dataset DE if >= 2 datasets ─────────────────────────────
+    try:
         if len(datasets) >= 2:
             _mappings = mappings or {}
             all_groups: set[str] = set()
             for ds in datasets:
-                for raw_g in ds["meta"][ds["group_col"]].dropna().unique():
-                    all_groups.add(resolve_group(raw_g, _mappings))
+                gc = ds.get("group_col", "")
+                if gc and gc in ds["meta"].columns:
+                    for raw_g in ds["meta"][gc].dropna().unique():
+                        all_groups.add(resolve_group(str(raw_g), _mappings))
 
             for group_a, group_b in itertools.combinations(all_groups, 2):
                 n_with_pair = sum(
                     1 for ds in datasets
-                    if group_a in {resolve_group(g, _mappings) for g in ds["meta"][ds["group_col"]].values}
-                    and group_b in {resolve_group(g, _mappings) for g in ds["meta"][ds["group_col"]].values}
+                    if (gc := ds.get("group_col", "")) and gc in ds["meta"].columns
+                    and group_a in {resolve_group(str(g), _mappings) for g in ds["meta"][gc].dropna().unique()}
+                    and group_b in {resolve_group(str(g), _mappings) for g in ds["meta"][gc].dropna().unique()}
                 )
                 if n_with_pair < 2:
                     continue
@@ -196,11 +206,10 @@ def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], s
                             "genes": top_consistent,
                         })
                         seed_id += 1
-                except Exception:
-                    pass
-
-    except Exception:
-        pass  # graceful degradation: agent starts without seeds
+                except Exception as e:
+                    summary_lines.append(f"  CROSS — {group_a} vs {group_b}: error — {e}")
+    except Exception as e:
+        summary_lines.append(f"  Cross-dataset seeder error — {e}")
 
     seed_summary = (
         "Pre-analysis statistical results:\n" + "\n".join(summary_lines)
