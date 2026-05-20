@@ -10,11 +10,14 @@ import uuid
 from io import StringIO
 from typing import Optional
 
+from pathlib import Path
+
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .agent.runner import run_agent_loop
@@ -368,3 +371,17 @@ async def get_group_mappings():
 async def delete_dataset(dataset_id: str):
     _datasets.pop(dataset_id, None)
     return {"ok": True}
+
+
+# Serve the React production build — only active when `npm run build` has been run.
+_BUILD_DIR = Path(__file__).parent.parent / "build"
+
+if _BUILD_DIR.exists():
+    app.mount("/static", StaticFiles(directory=_BUILD_DIR / "static"), name="static")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        file = _BUILD_DIR / full_path
+        if file.is_file():
+            return FileResponse(file)
+        return FileResponse(_BUILD_DIR / "index.html")
