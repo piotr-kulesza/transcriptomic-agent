@@ -12,7 +12,7 @@ def deg_voting(datasets: list, deg_datasets: dict = None,
                mappings: dict = None,
                adj_p_threshold: float = 0.05,
                logfc_threshold: float = 0.5,
-               topN: int = 30, **_) -> dict:
+               topN: int = 20, **_) -> dict:
     """
     For each gene, count how many DEG tables show it as significant
     (adj_p < threshold, |logFC| > threshold) with consistent direction.
@@ -177,7 +177,7 @@ def deg_biomarker_ranking(datasets: list, deg_datasets: dict = None,
                            mappings: dict = None,
                            adj_p_threshold: float = 0.05,
                            logfc_threshold: float = 0.5,
-                           topN: int = 30, **_) -> dict:
+                           topN: int = 15, **_) -> dict:
     """
     Composite biomarker score per gene:
       score = freq * consistency * mean_abs_logFC * mean_(-log10_adj_p)
@@ -472,8 +472,8 @@ def network_meta_analysis(datasets: list, deg_datasets: dict = None,
             })
 
         records.sort(key=lambda x: -x["score"])
-        top_up   = [r for r in records if r["indirect_logFC"] > 0][:topN // 2]
-        top_down = [r for r in records if r["indirect_logFC"] < 0][:topN // 2]
+        top_up   = [r for r in records if r["indirect_logFC"] > 0][:5]
+        top_down = [r for r in records if r["indirect_logFC"] < 0][:5]
 
         n_direct   = sum(1 for s in all_paths if len(s) == 1)
         n_indirect = sum(1 for s in all_paths if len(s) > 1)

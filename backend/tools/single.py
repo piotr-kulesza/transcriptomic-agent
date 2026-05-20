@@ -312,7 +312,8 @@ def pathway_enrichment(datasets: dict, genes: list = None, deg_datasets: dict = 
         enrichment = round((k / n) / (K / N), 2) if n > 0 else 0
         results.append({
             "pathway": pathway,
-            "overlap_genes": overlap,
+            "overlap_genes": overlap[:10],
+            "n_overlap_genes": k,
             "k": k,
             "K": K,
             "n_input": n,
@@ -335,7 +336,7 @@ def pathway_enrichment(datasets: dict, genes: list = None, deg_datasets: dict = 
     df = df.sort_values("adj_p")
 
     sig = df[df["adj_p"] < 0.05]
-    top = df.head(10).to_dict("records")
+    top = df.head(5).to_dict("records")
 
     return {
         "genes_input": n,

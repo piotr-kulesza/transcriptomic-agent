@@ -173,8 +173,8 @@ def cross_dataset_de(datasets, groupA=None, groupB=None, deg_datasets=None,
         "n_filtered_by_directionality": n_directionally_inconsistent,
         "n_filtered_by_effect_size": n_below_effect_size,
         "min_effect_size_used": min_effect_size,
-        "top_consistent_up":   [x for x in entries if x["direction"] == "UP"][:topN],
-        "top_consistent_down": [x for x in entries if x["direction"] == "DOWN"][:topN],
+        "top_consistent_up":   [{k: v for k, v in x.items() if k != "per_dataset"} for x in entries if x["direction"] == "UP"][:topN],
+        "top_consistent_down": [{k: v for k, v in x.items() if k != "per_dataset"} for x in entries if x["direction"] == "DOWN"][:topN],
     }
 
 
