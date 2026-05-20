@@ -120,13 +120,13 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
     if deg_only:
         strategy = (
             "STRATEGY (DEG-only mode \u2014 adapt freely):\n"
-            "1. deg_voting to identify most consistently DE genes across tables\n"
-            "2. cross_dataset_de for meta-analysis p-values and Fisher-combined significance\n"
-            "3. pathway_enrichment on top ranked genes (UP and DOWN separately; use deg_dataset_name to auto-extract)\n"
-            "4. deg_biomarker_ranking for composite biomarker candidates\n"
-            "5. deg_cooccurrence_network to find hub genes appearing together across tables\n"
-            "6. deg_direction_comparison if multiple disease types are available\n"
-            "7. network_meta_analysis to derive indirect comparisons (e.g. A vs C via shared B)\n"
+            "1. network_meta_analysis (no params) \u2014 run first to derive all indirect comparisons and establish the full group comparison landscape\n"
+            "2. deg_voting to identify most consistently DE genes across tables\n"
+            "3. cross_dataset_de for meta-analysis p-values and Fisher-combined significance\n"
+            "4. pathway_enrichment on top ranked genes (UP and DOWN separately; use deg_dataset_name to auto-extract)\n"
+            "5. deg_biomarker_ranking for composite biomarker candidates\n"
+            "6. deg_cooccurrence_network to find hub genes appearing together across tables\n"
+            "7. deg_direction_comparison if multiple disease types are available\n"
             "8. execute_code for any custom computation on the DEG table data\n"
             "9. DONE"
         )
@@ -204,6 +204,11 @@ HYPOTHESIS EVALUATION RULES:
   evidence. UNCERTAIN means evidence is mixed or insufficient.
   PENDING means no evidence collected yet \u2014 it should not persist
   beyond the step where evidence was gathered.
+
+NETWORK META-ANALYSIS PREFERENCE:
+- When network_meta_analysis results are available for a group pair, PREFER them over single-study direct comparisons for hypothesis evidence — they integrate indirect evidence across the full comparison network and are more robust to study-specific noise.
+- If network_meta_analysis shows a gene as UP in A vs B with high consistency, treat this as stronger evidence than a single DEG table showing the same direction.
+- Always cite the n_paths and consistency score when interpreting network_meta_analysis results.
 
 IMPORTANT RULES FOR HYPOTHESIS TESTING:
 - Seed hypotheses S1..Sn are based on genome-wide MWU + BH correction already performed by the pre-analysis. Do NOT retest their significance with execute_code on a gene subset \u2014 this is selective testing and inflates false positives.
