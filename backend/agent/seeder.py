@@ -147,24 +147,20 @@ def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = N
         except Exception as e:
             summary_lines.append(f"  {ds_name}: seeder error — {e}")
 
-    # ── 2. Per-DEG-comparison seeding ────────────────────────────────────
+    # ── 2. DEG table summary (informational only — no seeds, agent already has the tables) ──
     for ds_name, ds in _deg.items():
         try:
             for comp in ds["comparisons"]:
                 df = comp["df"]
-                sig = df[(df["adj_p"] < 0.05) & (df["logFC"].abs() > 0.5)].sort_values("adj_p")
+                sig = df[(df["adj_p"] < 0.05) & (df["logFC"].abs() > 0.5)]
                 n_sig = len(sig)
-                top_up   = sig[sig["logFC"] > 0].head(5).index.tolist()
-                top_down = sig[sig["logFC"] < 0].head(5).index.tolist()
-                top_genes = top_up + top_down
-
+                top_up   = sig[sig["logFC"] > 0].sort_values("adj_p").head(3).index.tolist()
+                top_down = sig[sig["logFC"] < 0].sort_values("adj_p").head(3).index.tolist()
                 summary_lines.append(
-                    f"  {ds_name} — {comp['groupA']} vs {comp['groupB']}: "
-                    f"{n_sig} DE genes (adj_p<0.05, |logFC|>0.5)"
+                    f"  {ds_name} — {comp['groupA']} vs {comp['groupB']}: {n_sig} DE genes"
                     + (f", top UP: {', '.join(top_up)}" if top_up else "")
                     + (f", top DOWN: {', '.join(top_down)}" if top_down else "")
                 )
-
                 seed_data["per_dataset_de"].append({
                     "dataset": ds_name,
                     "groupA": comp["groupA"],
@@ -173,25 +169,8 @@ def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = N
                     "top_up": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_up],
                     "top_down": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_down],
                 })
-
-                if top_genes:
-                    seeds.append({
-                        "id": f"S{seed_id}",
-                        "text": (
-                            f"{n_sig} genes DE between {comp['groupA']} and {comp['groupB']} "
-                            f"in {ds_name} (pre-computed, adj_p<0.05, |logFC|>0.5). "
-                            f"Top UP: {', '.join(top_up) or 'none'}. "
-                            f"Top DOWN: {', '.join(top_down) or 'none'}."
-                        ),
-                        "status": "pending",
-                        "evidence": [],
-                        "proposed_at": 0,
-                        "seeded_by": "auto_deg",
-                        "genes": top_genes,
-                    })
-                    seed_id += 1
         except Exception as e:
-            summary_lines.append(f"  {ds_name}: DEG seeder error — {e}")
+            summary_lines.append(f"  {ds_name}: DEG summary error — {e}")
 
     # ── 3. Cross-dataset DE (raw datasets + DEG tables combined) ─────────
     try:
