@@ -33,6 +33,7 @@ def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], s
     ds_dict = {ds["name"]: ds for ds in datasets}
 
     # ── 1. Per-dataset differential expression (MWU + BH) ────────────────
+    summary_lines.append(f"DEBUG: {len(datasets)} datasets passed to seeder, ds_dict keys: {list(ds_dict.keys())}")
     for ds_name, ds in ds_dict.items():
         try:
             expr = ds["expr"]
@@ -42,6 +43,7 @@ def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], s
                 summary_lines.append(f"  {ds_name}: skipped — no valid group column (gc={gc!r})")
                 continue
             groups = meta[gc].dropna().unique().tolist()
+            summary_lines.append(f"  {ds_name}: gc={gc!r}, groups={groups}")
 
             for group_a, group_b in itertools.combinations(groups, 2):
                 sA = meta[meta[gc] == group_a].index.intersection(expr.columns)
