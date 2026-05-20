@@ -482,7 +482,7 @@ export default function App() {
             </div>
 
             <div className="sec">Hypotheses to test</div>
-            <input type="number" value={maxHypotheses} min={1} max={10}
+            <input type="number" value={maxHypotheses} min={1} max={30}
               onChange={e => setMaxHypotheses(parseInt(e.target.value))}
               style={{ marginBottom: 14 }} />
 
