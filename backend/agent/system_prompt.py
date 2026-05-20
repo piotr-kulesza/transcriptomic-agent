@@ -156,6 +156,7 @@ Common genes across all datasets: {common_genes_count}
 {cross_header}
 - cross_dataset_de: {{groupA, groupB, topN}} \u2014 automatically includes any uploaded DEG datasets matching the comparison
 - pathway_enrichment: {{genes[], deg_dataset_name}} \u2014 enrichment against Hallmarks/KEGG; pass sig_genes_up/sig_genes_down from differential_expression, or use deg_dataset_name to auto-extract significant genes from an uploaded DEG table file (NOT a raw expression dataset)
+  IMPORTANT: pathway_enrichment accepts either (a) genes=[list of gene symbols] \u2014 use this for custom gene lists, or (b) deg_dataset_name='DEG N' \u2014 use this to auto-extract significant genes from an uploaded DEG table. Never pass deg_dataset_name when you already have a gene list from a previous tool call \u2014 use genes= instead. If both are passed, genes takes priority and deg_dataset_name is ignored.
 {extra_cross_tools}
 {deg_tools_block}
 
@@ -229,18 +230,12 @@ CRITICAL \u2014 AVOID CIRCULAR REASONING:
 - For genome-wide differential expression always use the differential_expression tool \u2014 it tests all genes with BH multiple-testing correction.
 
 EXECUTE_CODE RULES:
-- Use execute_code ONLY for novel computations: statistical tests, data transformations, numerical calculations on raw data.
-- FORBIDDEN uses of execute_code:
-  * print() statements summarizing known results
-  * Formatting gene lists or pathway names into readable text
-  * Building dicts of hardcoded values from previous tool results
-  * "Confirming" hypotheses by restating evidence already collected
-  * Python comments (# ...) or docstrings used as a scratchpad for notes or observations \u2014 write these in the "thought" field instead
-  * Code blocks that contain only comments with no actual computation
-- Before every execute_code call, ask yourself:
-  "Does this code compute something NEW that I don't already know from previous tool results?"
-  If NO \u2192 write the conclusion in the "thought" field instead. Do NOT use execute_code as a notepad.
-  If YES \u2192 proceed with execute_code. The code must produce a numeric or tabular result.
+- Use execute_code ONLY when you need to compute something NEW that cannot be obtained from existing tool results directly.
+- FORBIDDEN: hardcoding logFC, effect sizes, or gene lists as Python dicts/lists and then computing statistics on them. If you need effect size statistics for specific genes, use gene_expression_by_group or retrieve values from deg_datasets directly.
+- FORBIDDEN: using execute_code to format, summarize, or narrate conclusions already visible in previous tool results.
+- FORBIDDEN: print() statements summarizing known results, formatting gene lists or pathway names into readable text, "confirming" hypotheses by restating evidence already collected, Python comments or docstrings used as a scratchpad, code blocks that contain only comments with no actual computation.
+- ALLOWED: novel cross-dataset computations, custom aggregations across multiple tool results, validation of rules in held-out data.
+- Before every execute_code call ask: "Does this code compute something I genuinely do not already know?" If NO \u2014 write the conclusion in the "thought" field instead.
 
 STATISTICAL CAUTION:
 - Effect size alone (Cohen's d, logFC) is never sufficient for "confirmed" \u2014 you need adj_p < 0.05

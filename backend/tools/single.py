@@ -263,8 +263,12 @@ def pathway_enrichment(datasets: dict, genes: list = None, deg_datasets: dict = 
     from scipy.stats import hypergeom
     import pandas as pd
 
+    # If both provided, genes takes priority
+    if genes and deg_dataset_name:
+        deg_dataset_name = None
+
     # Extract genes from a DEG dataset if requested
-    if deg_dataset_name:
+    if deg_dataset_name and not genes:
         if not deg_datasets or deg_dataset_name not in deg_datasets:
             available = list(deg_datasets.keys()) if deg_datasets else []
             return {"error": f"DEG dataset '{deg_dataset_name}' not found. Available: {available}"}
@@ -274,8 +278,12 @@ def pathway_enrichment(datasets: dict, genes: list = None, deg_datasets: dict = 
             df = comp["df"]
             sig = df[(df["adj_p"] < adj_p_threshold) & (df["logFC"].abs() > logfc_threshold)]
             extracted.extend(sig.index.tolist())
-        if not genes:
-            genes = list(set(extracted))
+        genes = list(set(extracted))
+        import logging as _logging
+        _logging.getLogger(__name__).info(
+            "pathway_enrichment: extracted %d genes from '%s' (adj_p<%.2f, |logFC|>%.2f)",
+            len(genes), deg_dataset_name, adj_p_threshold, logfc_threshold,
+        )
         if not genes:
             return {"error": f"No significant genes (adj_p<{adj_p_threshold}, |logFC|>{logfc_threshold}) found in DEG dataset '{deg_dataset_name}'"}
 
