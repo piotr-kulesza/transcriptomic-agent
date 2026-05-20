@@ -15,7 +15,7 @@ from statsmodels.stats.multitest import multipletests
 from ..tools.cross import cross_dataset_de, resolve_group
 
 
-def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], str, dict]:
+def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = None) -> tuple[list[dict], str, dict]:
     """
     Run genome-wide MWU + BH pre-analysis per dataset/group-pair and return
     (seed_hypotheses, seed_summary_text, seed_data).
@@ -28,12 +28,12 @@ def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], s
     summary_lines: list[str] = []
     seed_id = 1
     seed_data: dict = {"per_dataset_de": [], "cross_de": []}
+    _deg = deg_datasets or {}
 
     # Convert list → dict keyed by dataset name for iteration
     ds_dict = {ds["name"]: ds for ds in datasets}
 
     # ── 1. Per-dataset differential expression (MWU + BH) ────────────────
-    summary_lines.append(f"DEBUG: {len(datasets)} datasets passed to seeder, ds_dict keys: {list(ds_dict.keys())}")
     for ds_name, ds in ds_dict.items():
         try:
             expr = ds["expr"]
@@ -43,7 +43,6 @@ def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], s
                 summary_lines.append(f"  {ds_name}: skipped — no valid group column (gc={gc!r})")
                 continue
             groups = meta[gc].dropna().unique().tolist()
-            summary_lines.append(f"  {ds_name}: gc={gc!r}, groups={groups}")
 
             for group_a, group_b in itertools.combinations(groups, 2):
                 sA = meta[meta[gc] == group_a].index.intersection(expr.columns)
@@ -148,69 +147,129 @@ def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], s
         except Exception as e:
             summary_lines.append(f"  {ds_name}: seeder error — {e}")
 
-    # ── 2. Cross-dataset DE if >= 2 datasets ─────────────────────────────
-    try:
-        if len(datasets) >= 2:
-            _mappings = mappings or {}
-            all_groups: set[str] = set()
-            for ds in datasets:
-                gc = ds.get("group_col", "")
-                if gc and gc in ds["meta"].columns:
-                    for raw_g in ds["meta"][gc].dropna().unique():
-                        all_groups.add(resolve_group(str(raw_g), _mappings))
+    # ── 2. Per-DEG-comparison seeding ────────────────────────────────────
+    for ds_name, ds in _deg.items():
+        try:
+            for comp in ds["comparisons"]:
+                df = comp["df"]
+                sig = df[(df["adj_p"] < 0.05) & (df["logFC"].abs() > 0.5)].sort_values("adj_p")
+                n_sig = len(sig)
+                top_up   = sig[sig["logFC"] > 0].head(5).index.tolist()
+                top_down = sig[sig["logFC"] < 0].head(5).index.tolist()
+                top_genes = top_up + top_down
 
-            for group_a, group_b in itertools.combinations(all_groups, 2):
-                n_with_pair = sum(
-                    1 for ds in datasets
-                    if (gc := ds.get("group_col", "")) and gc in ds["meta"].columns
-                    and group_a in {resolve_group(str(g), _mappings) for g in ds["meta"][gc].dropna().unique()}
-                    and group_b in {resolve_group(str(g), _mappings) for g in ds["meta"][gc].dropna().unique()}
+                summary_lines.append(
+                    f"  {ds_name} — {comp['groupA']} vs {comp['groupB']}: "
+                    f"{n_sig} DE genes (adj_p<0.05, |logFC|>0.5)"
+                    + (f", top UP: {', '.join(top_up)}" if top_up else "")
+                    + (f", top DOWN: {', '.join(top_down)}" if top_down else "")
                 )
-                if n_with_pair < 2:
-                    continue
-                try:
-                    result = cross_dataset_de(datasets, groupA=group_a, groupB=group_b, topN=10, mappings=_mappings)
-                    if "error" in result:
-                        continue
-                    top_up_cross   = [g["gene"] for g in result.get("top_consistent_up", [])[:3]]
-                    top_down_cross = [g["gene"] for g in result.get("top_consistent_down", [])[:3]]
-                    top_consistent = top_up_cross + top_down_cross
-                    n_consistent   = result.get("n_genes_tested", len(top_consistent))
 
-                    seed_data["cross_de"].append({
-                        "groupA": group_a,
-                        "groupB": group_b,
-                        "top_up": result.get("top_consistent_up", [])[:5],
-                        "top_down": result.get("top_consistent_down", [])[:5],
-                        "n_tested": result.get("n_genes_tested"),
-                        "interpretation": result.get("interpretation", ""),
+                seed_data["per_dataset_de"].append({
+                    "dataset": ds_name,
+                    "groupA": comp["groupA"],
+                    "groupB": comp["groupB"],
+                    "n_sig": n_sig,
+                    "top_up": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_up],
+                    "top_down": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_down],
+                })
+
+                if top_genes:
+                    seeds.append({
+                        "id": f"S{seed_id}",
+                        "text": (
+                            f"{n_sig} genes DE between {comp['groupA']} and {comp['groupB']} "
+                            f"in {ds_name} (pre-computed, adj_p<0.05, |logFC|>0.5). "
+                            f"Top UP: {', '.join(top_up) or 'none'}. "
+                            f"Top DOWN: {', '.join(top_down) or 'none'}."
+                        ),
+                        "status": "pending",
+                        "evidence": [],
+                        "proposed_at": 0,
+                        "seeded_by": "auto_deg",
+                        "genes": top_genes,
                     })
+                    seed_id += 1
+        except Exception as e:
+            summary_lines.append(f"  {ds_name}: DEG seeder error — {e}")
 
-                    summary_lines.append(
-                        f"  CROSS — {group_a} vs {group_b}: "
-                        f"{n_with_pair} datasets, consistent genes: "
-                        + (f"UP {', '.join(top_up_cross)}" if top_up_cross else "")
-                        + (f" DOWN {', '.join(top_down_cross)}" if top_down_cross else "")
-                    )
-                    if top_consistent:
-                        description = (
+    # ── 3. Cross-dataset DE (raw datasets + DEG tables combined) ─────────
+    try:
+        _mappings = mappings or {}
+        all_groups: set[str] = set()
+
+        for ds in datasets:
+            gc = ds.get("group_col", "")
+            if gc and gc in ds["meta"].columns:
+                for raw_g in ds["meta"][gc].dropna().unique():
+                    all_groups.add(resolve_group(str(raw_g), _mappings))
+
+        for ds_name, ds in _deg.items():
+            for comp in ds["comparisons"]:
+                all_groups.add(resolve_group(comp["groupA"], _mappings))
+                all_groups.add(resolve_group(comp["groupB"], _mappings))
+
+        for group_a, group_b in itertools.combinations(all_groups, 2):
+            n_raw = sum(
+                1 for ds in datasets
+                if (gc := ds.get("group_col", "")) and gc in ds["meta"].columns
+                and group_a in {resolve_group(str(g), _mappings) for g in ds["meta"][gc].dropna().unique()}
+                and group_b in {resolve_group(str(g), _mappings) for g in ds["meta"][gc].dropna().unique()}
+            )
+            n_deg = sum(
+                1 for ds in _deg.values()
+                if any(
+                    {resolve_group(c["groupA"], _mappings), resolve_group(c["groupB"], _mappings)} == {group_a, group_b}
+                    for c in ds["comparisons"]
+                )
+            )
+            if n_raw + n_deg < 2:
+                continue
+            try:
+                result = cross_dataset_de(
+                    datasets, groupA=group_a, groupB=group_b,
+                    topN=10, mappings=_mappings, deg_datasets=_deg,
+                )
+                if "error" in result:
+                    continue
+                top_up_cross   = [g["gene"] for g in result.get("top_consistent_up", [])[:3]]
+                top_down_cross = [g["gene"] for g in result.get("top_consistent_down", [])[:3]]
+                top_consistent = top_up_cross + top_down_cross
+                n_sources      = n_raw + n_deg
+
+                seed_data["cross_de"].append({
+                    "groupA": group_a,
+                    "groupB": group_b,
+                    "top_up": result.get("top_consistent_up", [])[:5],
+                    "top_down": result.get("top_consistent_down", [])[:5],
+                    "n_tested": result.get("n_genes_tested"),
+                    "interpretation": result.get("interpretation", ""),
+                })
+
+                summary_lines.append(
+                    f"  CROSS — {group_a} vs {group_b}: "
+                    f"{n_sources} sources, consistent genes: "
+                    + (f"UP {', '.join(top_up_cross)}" if top_up_cross else "")
+                    + (f" DOWN {', '.join(top_down_cross)}" if top_down_cross else "")
+                )
+                if top_consistent:
+                    seeds.append({
+                        "id": f"S{seed_id}",
+                        "text": (
                             f"{len(top_consistent)} genes consistently DE across "
-                            f"{n_with_pair} datasets ({group_a} vs {group_b}). "
+                            f"{n_sources} sources ({group_a} vs {group_b}). "
                             f"Top: {', '.join(top_consistent)}. "
                             f"Investigate replicability and biological significance."
-                        )
-                        seeds.append({
-                            "id": f"S{seed_id}",
-                            "text": description,
-                            "status": "pending",
-                            "evidence": [],
-                            "proposed_at": 0,
-                            "seeded_by": "auto_cross",
-                            "genes": top_consistent,
-                        })
-                        seed_id += 1
-                except Exception as e:
-                    summary_lines.append(f"  CROSS — {group_a} vs {group_b}: error — {e}")
+                        ),
+                        "status": "pending",
+                        "evidence": [],
+                        "proposed_at": 0,
+                        "seeded_by": "auto_cross",
+                        "genes": top_consistent,
+                    })
+                    seed_id += 1
+            except Exception as e:
+                summary_lines.append(f"  CROSS — {group_a} vs {group_b}: error — {e}")
     except Exception as e:
         summary_lines.append(f"  Cross-dataset seeder error — {e}")
 
