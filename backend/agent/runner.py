@@ -272,13 +272,20 @@ async def run_agent_loop(
 
         yield {"type": "thinking", "text": f"Agent thinking... ({evaluated}/{max_hypotheses} hypotheses evaluated)"}
 
+        # Apply prompt caching: mark all messages except the last 2 as cacheable
+        for msg in messages[:-2]:
+            if isinstance(msg["content"], list):
+                msg["content"][-1]["cache_control"] = {"type": "ephemeral"}
+            elif isinstance(msg["content"], str):
+                msg["content"] = [{"type": "text", "text": msg["content"], "cache_control": {"type": "ephemeral"}}]
+
         raw = ""
         try:
             async with client.messages.stream(
                 model="claude-sonnet-4-20250514",
                 max_tokens=16000,
                 temperature=temperature,
-                system=system_prompt,
+                system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
                 messages=messages,
             ) as stream:
                 chunk_buf = ""
