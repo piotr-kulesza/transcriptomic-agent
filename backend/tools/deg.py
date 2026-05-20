@@ -1,6 +1,8 @@
-from collections import Counter, defaultdict
+import itertools
+from collections import Counter, defaultdict, deque
 
 import numpy as np
+import pandas as pd
 
 from .cross import resolve_group
 
@@ -355,5 +357,161 @@ def deg_direction_comparison(datasets: list, deg_datasets: dict = None,
             f"Top concordant: {concordant[0]['gene']} "
             f"(logFC_A={concordant[0]['logFC_A']}, logFC_B={concordant[0]['logFC_B']})"
             if concordant else "No shared genes between comparisons"
+        ),
+    }
+
+
+def network_meta_analysis(datasets: list, deg_datasets: dict = None,
+                          groupA: str = None, groupB: str = None,
+                          mappings: dict = None, topN: int = 20, **_) -> dict:
+    """
+    Network meta-analysis using DEG tables as edges in a comparison network.
+    Uses the Bucher indirect comparison method: logFC(A vs C) via B =
+    logFC(A vs B) + logFC(B vs C), summing logFCs along all simple paths
+    through the network (max 3 hops). Each DEG comparison is one edge.
+
+    If groupA/groupB are specified, analyses that specific pair.
+    Otherwise analyses all pairs not covered by direct comparisons.
+    """
+    _deg = deg_datasets or {}
+    _mappings = mappings or {}
+
+    if not _deg:
+        return {"error": "No DEG tables available for network meta-analysis"}
+
+    # Build edge list: (gA, gB, df, label)
+    # df indexed by gene; logFC = mean(gA) - mean(gB)
+    edges = []
+    for ds_name, ds in _deg.items():
+        for comp in ds["comparisons"]:
+            gA = resolve_group(comp["groupA"], _mappings)
+            gB = resolve_group(comp["groupB"], _mappings)
+            edges.append((gA, gB, comp["df"], f"{ds_name}:{gA}v{gB}"))
+
+    if not edges:
+        return {"error": "No valid comparisons found in DEG tables"}
+
+    all_groups = sorted({g for gA, gB, _, _ in edges for g in (gA, gB)})
+
+    # Adjacency: node → [(neighbor, df, label, direction)]
+    # direction +1: logFC in df is (node vs neighbor); -1: negate for reverse traversal
+    adj: dict = defaultdict(list)
+    for gA, gB, df, label in edges:
+        adj[gA].append((gB, df, label, +1))
+        adj[gB].append((gA, df, label, -1))
+
+    # Determine which pairs to analyze
+    direct_pairs = {(gA, gB) for gA, gB, _, _ in edges} | {(gB, gA) for gA, gB, _, _ in edges}
+    if groupA and groupB:
+        gA_r = resolve_group(groupA, _mappings)
+        gB_r = resolve_group(groupB, _mappings)
+        if gA_r not in adj or gB_r not in adj:
+            return {"error": f"Group {groupA!r} or {groupB!r} not found in DEG network"}
+        pairs = [(gA_r, gB_r)]
+    else:
+        # Prefer indirect pairs; fall back to all pairs if everything is direct
+        indirect = [(a, b) for a, b in itertools.combinations(all_groups, 2)
+                    if (a, b) not in direct_pairs and (b, a) not in direct_pairs]
+        pairs = indirect if indirect else list(itertools.combinations(all_groups, 2))
+
+    if not pairs:
+        return {"error": "No pairs to analyze", "network_groups": all_groups}
+
+    comparison_results = []
+
+    for src, dst in pairs:
+        # BFS: find all simple paths src → dst up to 3 hops
+        all_paths = []
+        queue: deque = deque([(src, [], {src})])
+        while queue:
+            node, steps, visited = queue.popleft()
+            if node == dst:
+                all_paths.append(steps)
+                continue
+            if len(steps) >= 3:
+                continue
+            for neighbor, df, label, direction in adj[node]:
+                if neighbor not in visited:
+                    queue.append((neighbor, steps + [(df, label, direction)], visited | {neighbor}))
+
+        if not all_paths:
+            continue
+
+        # Per-path: compute indirect logFC as sum of edge logFCs × direction
+        path_estimates: list[pd.Series] = []
+        for steps in all_paths:
+            common = set(steps[0][0].index)
+            for df, _, _ in steps[1:]:
+                common &= set(df.index)
+            if not common:
+                continue
+            common_list = sorted(common)
+            lfc = pd.Series(0.0, index=common_list)
+            for df, _, direction in steps:
+                lfc += df.loc[common_list, "logFC"].values * direction
+            path_estimates.append(lfc)
+
+        if not path_estimates:
+            continue
+
+        # Combine: per-gene mean logFC and consistency across paths
+        all_gene_idx = sorted(set().union(*[set(s.index) for s in path_estimates]))
+        records = []
+        for gene in all_gene_idx:
+            vals = [float(s[gene]) for s in path_estimates if gene in s.index]
+            mean_lfc = float(np.mean(vals))
+            if abs(mean_lfc) < 0.3:
+                continue
+            consistency = float(max(0.0, 1.0 - np.std(vals) / (abs(mean_lfc) + 1e-6))) if len(vals) > 1 else 0.5
+            records.append({
+                "gene": gene,
+                "indirect_logFC": round(mean_lfc, 3),
+                "n_paths": len(vals),
+                "consistency": round(consistency, 3),
+                "score": abs(mean_lfc) * consistency * len(vals),
+            })
+
+        records.sort(key=lambda x: -x["score"])
+        top_up   = [r for r in records if r["indirect_logFC"] > 0][:topN // 2]
+        top_down = [r for r in records if r["indirect_logFC"] < 0][:topN // 2]
+
+        n_direct   = sum(1 for s in all_paths if len(s) == 1)
+        n_indirect = sum(1 for s in all_paths if len(s) > 1)
+
+        comparison_results.append({
+            "groupA": src,
+            "groupB": dst,
+            "n_direct_paths": n_direct,
+            "n_indirect_paths": n_indirect,
+            "top_up": top_up,
+            "top_down": top_down,
+        })
+
+    if not comparison_results:
+        return {
+            "error": "No paths found between requested groups",
+            "network_groups": all_groups,
+            "direct_comparisons": [(gA, gB) for gA, gB, _, _ in edges],
+        }
+
+    parts = []
+    for cr in comparison_results:
+        up_genes   = [r["gene"] for r in cr["top_up"][:3]]
+        down_genes = [r["gene"] for r in cr["top_down"][:3]]
+        parts.append(
+            f"{cr['groupA']} vs {cr['groupB']} "
+            f"({cr['n_indirect_paths']} indirect path(s)): "
+            + (f"UP {', '.join(up_genes)}" if up_genes else "no UP genes")
+            + " | "
+            + (f"DOWN {', '.join(down_genes)}" if down_genes else "no DOWN genes")
+        )
+
+    return {
+        "network_groups": all_groups,
+        "n_direct_edges": len(edges),
+        "comparisons": comparison_results,
+        "interpretation": (
+            f"Network meta-analysis: {len(all_groups)} groups, {len(edges)} direct DEG comparisons, "
+            f"{len(comparison_results)} pair(s) analyzed. " + "; ".join(parts)
         ),
     }

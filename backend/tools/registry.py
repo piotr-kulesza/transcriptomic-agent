@@ -8,6 +8,7 @@ from .cross import (
 )
 from .deg import (
     deg_voting, deg_cooccurrence_network, deg_biomarker_ranking, deg_direction_comparison,
+    network_meta_analysis,
 )
 
 TOOLS = {
@@ -29,6 +30,7 @@ TOOLS = {
     "deg_cooccurrence_network":  deg_cooccurrence_network,
     "deg_biomarker_ranking":     deg_biomarker_ranking,
     "deg_direction_comparison":  deg_direction_comparison,
+    "network_meta_analysis":     network_meta_analysis,
 }
 
 CROSS_TOOL_NAMES = {
@@ -37,6 +39,7 @@ CROSS_TOOL_NAMES = {
 
 DEG_TOOL_NAMES = {
     "deg_voting", "deg_cooccurrence_network", "deg_biomarker_ranking", "deg_direction_comparison",
+    "network_meta_analysis",
 }
 
 
@@ -63,6 +66,7 @@ def summarize_result(action: str, r: dict) -> str:
             "deg_cooccurrence_network":  lambda: r["interpretation"],
             "deg_biomarker_ranking":     lambda: r["interpretation"],
             "deg_direction_comparison":  lambda: r["interpretation"],
+            "network_meta_analysis":     lambda: r["interpretation"],
         }
         return m[action]() if action in m else str(r)[:80]
     except Exception:

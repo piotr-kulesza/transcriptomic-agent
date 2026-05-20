@@ -109,7 +109,12 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
             "gene co-occurrence network across DEG tables; min_cooccurrence filters weak edges; "
             "if result contains a 'warning' field the network is trivial (< 3 comparisons) \u2014 skip interpretation and note the warning\n"
             "- deg_direction_comparison: {comparisonA_groupA, comparisonA_groupB, comparisonB_groupA, comparisonB_groupB} \u2014 "
-            "concordant/discordant genes between two comparisons"
+            "concordant/discordant genes between two comparisons\n"
+            "- network_meta_analysis: {groupA, groupB, topN} \u2014 "
+            "Bucher indirect comparison method: derives logFC(A vs B) for group pairs not directly compared "
+            "by summing logFCs along paths through the DEG comparison network (max 3 hops). "
+            "groupA/groupB optional \u2014 if omitted, analyses all indirect pairs automatically. "
+            "Use when you need to compare groups that share a common comparator but lack a direct DEG table."
         )
 
     if deg_only:
@@ -121,8 +126,9 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
             "4. deg_biomarker_ranking for composite biomarker candidates\n"
             "5. deg_cooccurrence_network to find hub genes appearing together across tables\n"
             "6. deg_direction_comparison if multiple disease types are available\n"
-            "7. execute_code for any custom computation on the DEG table data\n"
-            "8. DONE"
+            "7. network_meta_analysis to derive indirect comparisons (e.g. A vs C via shared B)\n"
+            "8. execute_code for any custom computation on the DEG table data\n"
+            "9. DONE"
         )
     else:
         strategy = (
