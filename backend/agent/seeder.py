@@ -39,6 +39,7 @@ def generate_seeds(datasets: list, mappings: dict = None) -> tuple[list[dict], s
             meta = ds["meta"]
             gc = ds["group_col"]
             if not gc or gc not in meta.columns:
+                summary_lines.append(f"  {ds_name}: skipped — no valid group column (gc={gc!r})")
                 continue
             groups = meta[gc].dropna().unique().tolist()
 
