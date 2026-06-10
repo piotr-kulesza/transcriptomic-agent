@@ -14,6 +14,24 @@ from statsmodels.stats.multitest import multipletests
 
 from ..tools.cross import cross_dataset_de, resolve_group
 
+# Well-established immune/inflammatory marker genes used to detect immune signal in DE results
+_IMMUNE_MARKERS: frozenset = frozenset({
+    "HLA-DRA", "HLA-DRB1", "HLA-DRB5", "HLA-DQA1", "HLA-DQB1", "HLA-DPA1", "HLA-DPB1",
+    "CD74", "FCGR3A", "TYROBP", "LYZ", "AIF1", "PTPRC", "CD68", "CD163",
+    "IFIT1", "IFIT2", "IFIT3", "MX1", "ISG15", "OAS1", "OAS2", "RSAD2",
+    "CCL2", "CCL5", "CXCL10", "IL1B", "TNF", "IFNG", "IL6", "STAT1",
+})
+
+
+def _is_peritoneal_like(name: str) -> bool:
+    n = name.lower().replace("_", " ").replace("-", " ")
+    return "peritoneal" in n or n.strip() == "pe" or " pe " in f" {n} "
+
+
+def _is_healthy_like(name: str) -> bool:
+    n = name.lower()
+    return any(kw in n for kw in ["healthy", "normal", "eutopic", "control", "ctrl"])
+
 
 def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = None) -> tuple[list[dict], str, dict]:
     """
@@ -147,28 +165,83 @@ def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = N
         except Exception as e:
             summary_lines.append(f"  {ds_name}: seeder error — {e}")
 
-    # ── 2. DEG table summary (informational only — no seeds, agent already has the tables) ──
+    # ── 2. DEG table summary — generate GSEA-prompting and immune-signal seeds ──
     for ds_name, ds in _deg.items():
         try:
             for comp in ds["comparisons"]:
                 df = comp["df"]
                 sig = df[(df["adj_p"] < 0.05) & (df["logFC"].abs() > 0.5)]
                 n_sig = len(sig)
-                top_up   = sig[sig["logFC"] > 0].sort_values("adj_p").head(3).index.tolist()
-                top_down = sig[sig["logFC"] < 0].sort_values("adj_p").head(3).index.tolist()
+                top_up   = sig[sig["logFC"] > 0].sort_values("adj_p").head(10).index.tolist()
+                top_down = sig[sig["logFC"] < 0].sort_values("adj_p").head(10).index.tolist()
                 summary_lines.append(
                     f"  {ds_name} — {comp['groupA']} vs {comp['groupB']}: {n_sig} DE genes"
-                    + (f", top UP: {', '.join(top_up)}" if top_up else "")
-                    + (f", top DOWN: {', '.join(top_down)}" if top_down else "")
+                    + (f", top UP: {', '.join(top_up[:3])}" if top_up else "")
+                    + (f", top DOWN: {', '.join(top_down[:3])}" if top_down else "")
                 )
                 seed_data["per_dataset_de"].append({
                     "dataset": ds_name,
                     "groupA": comp["groupA"],
                     "groupB": comp["groupB"],
                     "n_sig": n_sig,
-                    "top_up": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_up],
-                    "top_down": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_down],
+                    "top_up": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_up[:3]],
+                    "top_down": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_down[:3]],
                 })
+
+                gA, gB = comp["groupA"], comp["groupB"]
+
+                # Detect immune/inflammatory signal in top UP genes
+                immune_hit = {g.upper() for g in top_up} & _IMMUNE_MARKERS
+                is_pe_vs_healthy = (
+                    (_is_peritoneal_like(gA) and _is_healthy_like(gB)) or
+                    (_is_peritoneal_like(gB) and _is_healthy_like(gA))
+                )
+
+                if is_pe_vs_healthy or immune_hit:
+                    detected_note = (
+                        f"Immune markers detected in top UP genes: {', '.join(sorted(immune_hit))}. "
+                        if immune_hit else ""
+                    )
+                    seeds.append({
+                        "id": f"S{seed_id}",
+                        "text": (
+                            f"{gA} vs {gB} ({ds_name}) shows immune/inflammatory signal. "
+                            + detected_note +
+                            f"Hypothesis: this comparison is enriched for allograft rejection, "
+                            f"MHC-II antigen presentation, interferon response, and inflammatory pathways. "
+                            f"REQUIRED: test with gsea_enrichment(deg_dataset_name='{ds_name}', "
+                            f"groupA='{gA}', groupB='{gB}') before evaluating."
+                        ),
+                        "status": "pending",
+                        "evidence": [],
+                        "proposed_at": 0,
+                        "seeded_by": "auto_immune",
+                        "genes": list(immune_hit)[:5] + [g for g in top_up[:5] if g.upper() not in immune_hit],
+                    })
+                    seed_id += 1
+                    summary_lines.append(
+                        f"  → Immune signal seeded (S{seed_id - 1}): {', '.join(sorted(immune_hit)) or 'PE-like group'}"
+                    )
+
+                # For every comparison with substantial DE signal, seed a GSEA-prompting hypothesis
+                # (skip if already handled by immune seed above)
+                elif n_sig >= 50:
+                    seeds.append({
+                        "id": f"S{seed_id}",
+                        "text": (
+                            f"{gA} vs {gB} ({ds_name}): {n_sig} DE genes. "
+                            f"Use gsea_enrichment(deg_dataset_name='{ds_name}', "
+                            f"groupA='{gA}', groupB='{gB}') to characterise the full pathway landscape "
+                            f"(UP and DOWN axes) without relying on arbitrary cutoffs."
+                        ),
+                        "status": "pending",
+                        "evidence": [],
+                        "proposed_at": 0,
+                        "seeded_by": "auto_gsea",
+                        "genes": top_up[:5] + top_down[:5],
+                    })
+                    seed_id += 1
+
         except Exception as e:
             summary_lines.append(f"  {ds_name}: DEG summary error — {e}")
 
@@ -311,6 +384,18 @@ def extract_evidence_stats(action: str, result: dict, genes: list[str]) -> dict:
                     for grp, v in grp_data.items()
                     if isinstance(v, dict)
                 }
+
+    elif action == "gsea_enrichment":
+        for dir_key in ("top_enriched_up", "top_enriched_down"):
+            direction = "UP" if dir_key == "top_enriched_up" else "DOWN"
+            for entry in result.get(dir_key, []):
+                if any(g.upper() in gene_set for g in entry.get("leading_edge", [])):
+                    stats[entry["pathway"]] = {
+                        "nes": entry.get("nes"),
+                        "adj_p": entry.get("adj_p"),
+                        "direction": direction,
+                        "leading_edge": entry.get("leading_edge", [])[:3],
+                    }
 
     elif action == "pathway_enrichment":
         for entry in result.get("top_enriched", []):
