@@ -187,10 +187,11 @@ def meta_rank(datasets: list, deg_datasets: dict,
     Positive Z = UP in groupA vs groupB.
     Returns a pandas Series of gene→Z sorted descending.
     Sources: raw expression datasets (weighted by sqrt(n)) + DEG tables (weight=1).
+    z-scores are winsorized to ±8 so a single underflowed p cannot dominate the ranking.
     """
     mappings = mappings or {}
-    # Accumulators: per-gene (sum of signed_z * weight, sum of weight^2)
-    acc = pd.DataFrame(columns=["sw", "w2"], dtype=float)
+    # Three accumulators per gene: sw = Σ(sign_z * weight), w2 = Σ(weight²), lfc_sw = Σ(logFC * weight)
+    acc = pd.DataFrame(columns=["sw", "w2", "lfc_sw"], dtype=float)
 
     for ds in datasets:
         expr = ds["expr"]
@@ -204,10 +205,13 @@ def meta_rank(datasets: list, deg_datasets: dict,
         weight = float(np.sqrt(len(sA) + len(sB)))
         _, p_raw = _mwu_cross(expr[sA].values, expr[sB].values)
         lfc = expr[sA].mean(axis=1).values - expr[sB].mean(axis=1).values
-        p_c = np.clip(np.where(np.isnan(p_raw), 1.0, p_raw), 1e-300, 1.0)
+        # p floor at 1e-12: ppf(1 - 5e-13) ≈ 7.1 in float64 → avoids +inf
+        p_c = np.clip(np.where(np.isnan(p_raw), 1.0, p_raw), 1e-12, 1.0)
         z_i = _norm.ppf(1.0 - p_c / 2.0)
+        z_i = np.nan_to_num(z_i, nan=0.0, posinf=8.0, neginf=-8.0)
         sw = np.sign(lfc) * z_i * weight
-        chunk = pd.DataFrame({"sw": sw, "w2": float(weight ** 2)}, index=expr.index)
+        chunk = pd.DataFrame({"sw": sw, "w2": float(weight ** 2), "lfc_sw": lfc * weight},
+                              index=expr.index)
         acc = acc.add(chunk, fill_value=0.0)
 
     for ds_name, ds in (deg_datasets or {}).items():
@@ -222,16 +226,24 @@ def meta_rank(datasets: list, deg_datasets: dict,
                 continue
             df = comp["df"]
             p_col = "p" if "p" in df.columns else "adj_p"
-            p_c = df[p_col].clip(1e-300, 1.0).fillna(1.0).values
+            # p floor at 1e-12 so ppf stays finite; nan_to_num as safety net
+            p_c = df[p_col].clip(1e-12, 1.0).fillna(1.0).values
             z_i = _norm.ppf(1.0 - p_c / 2.0)
-            sw = np.sign(df["logFC"].values * direction) * z_i
-            chunk = pd.DataFrame({"sw": sw, "w2": 1.0}, index=df.index)
+            z_i = np.nan_to_num(z_i, nan=0.0, posinf=8.0, neginf=-8.0)
+            lfc_vals = df["logFC"].values * direction
+            sw = np.sign(lfc_vals) * z_i
+            chunk = pd.DataFrame({"sw": sw, "w2": 1.0, "lfc_sw": lfc_vals}, index=df.index)
             acc = acc.add(chunk, fill_value=0.0)
 
     if acc.empty:
         return pd.Series(dtype=float)
-    stouffer = acc["sw"] / acc["w2"].pow(0.5).clip(lower=1e-9)
-    return stouffer.sort_values(ascending=False)
+    denom = acc["w2"].pow(0.5).clip(lower=1e-9)
+    stouffer_vals = np.nan_to_num((acc["sw"] / denom).values, nan=0.0, posinf=8.0, neginf=-8.0)
+    # Deterministic tie-breaker: genes with identical Z ordered by mean signed logFC (effect size).
+    # Coefficient 1e-7 is small enough not to change any primary ranking position.
+    mean_lfc_vals = np.nan_to_num((acc["lfc_sw"] / denom).values, nan=0.0)
+    result = pd.Series(stouffer_vals + 1e-7 * mean_lfc_vals, index=acc.index)
+    return result.sort_values(ascending=False)
 
 
 def meta_gsea(datasets: list, deg_datasets: dict = None,
