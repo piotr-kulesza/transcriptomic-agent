@@ -127,6 +127,7 @@ export default function App() {
   const [degGroupB,     setDegGroupB]     = useState("");
   const [degUploading,  setDegUploading]  = useState(false);
   const [degStatus,     setDegStatus]     = useState("");
+  const [runCost,       setRunCost]       = useState(null);
   const logEnd   = useRef(null);
   const abortRef = useRef(null);
 
@@ -223,7 +224,7 @@ export default function App() {
 
   const runAgent = async () => {
     if (!loaded.length && !degDatasets.length) return;
-    setPhase("running"); setLog([]); setStep(0); setHypotheses([]); setCurrentStatus("Running pre-analysis..."); setStreamingText("");
+    setPhase("running"); setLog([]); setStep(0); setHypotheses([]); setCurrentStatus("Running pre-analysis..."); setStreamingText(""); setRunCost(0);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -262,6 +263,7 @@ export default function App() {
             if (entry.type === "thinking")       { setStep(++currentStep); setCurrentStatus(entry.text); setStreamingText(""); addLog(entry); continue; }
             if (entry.type === "thought_stream") { flushSync(() => setStreamingText(prev => prev + entry.delta)); continue; }
             if (entry.type === "thought")        { flushSync(() => setStreamingText("")); }
+            if (entry.type === "usage")          { setRunCost(entry.total_cost_usd); continue; }
             if (entry.type === "hypothesis_propose") setHypotheses(prev => [...prev, entry.hypothesis]);
             if (entry.type === "hypothesis_eval")    setHypotheses(prev => prev.map(h => h.id === entry.hypothesis.id ? entry.hypothesis : h));
             addLog(entry);
@@ -304,6 +306,14 @@ export default function App() {
               <div className="blink" style={{ width: 6, height: 6, borderRadius: "50%", background: t.accent, boxShadow: `0 0 6px ${t.accent}`, flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: t.accent, fontWeight: 500 }}>
                 {hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} hypotheses
+              </span>
+            </div>
+          )}
+          {runCost !== null && (
+            <div title="Estimated API cost (claude-sonnet-4-6)" style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: `${t.accent}08`, border: `1px solid ${t.accent}22`, borderRadius: 5 }}>
+              <span style={{ fontSize: 11, color: t.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>$</span>
+              <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "'JetBrains Mono',monospace", fontWeight: 500 }}>
+                {runCost < 0.01 ? runCost.toFixed(4) : runCost.toFixed(3)}
               </span>
             </div>
           )}

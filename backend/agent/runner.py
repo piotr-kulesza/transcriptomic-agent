@@ -231,6 +231,7 @@ async def run_agent_loop(
     report_steps: list[dict] = []           # collected for final report
     last_call: tuple = None                 # (action, params_json) of previous step
     once_only_called: set = set()           # tools that may only be called once per run
+    total_cost_usd: float = 0.0             # accumulated API cost for this run
     _ONCE_ONLY = {"cross_dataset_de"}       # tools restricted to a single call per run
     # When no raw expression datasets are loaded, only DEG-compatible tools may run
     _deg_only = len(datasets) == 0 and bool(deg_datasets)
@@ -289,6 +290,7 @@ async def run_agent_loop(
                 msg["content"] = [{"type": "text", "text": msg["content"], "cache_control": {"type": "ephemeral"}}]
 
         raw = ""
+        _step_usage = None
         try:
             async with client.messages.stream(
                 model="claude-sonnet-4-6",
@@ -309,10 +311,33 @@ async def run_agent_loop(
                         last_flush = now
                 if chunk_buf:
                     yield {"type": "thought_stream", "delta": chunk_buf}
+                try:
+                    _step_usage = (await stream.get_final_message()).usage
+                except Exception:
+                    pass
         except Exception as e:
             logger.error("API error at step %d: %s", step_num, e, exc_info=True)
             yield {"type": "error", "text": f"API error: {e}"}
             return
+
+        if _step_usage is not None:
+            _in  = _step_usage.input_tokens
+            _out = _step_usage.output_tokens
+            _cw  = getattr(_step_usage, "cache_creation_input_tokens", 0) or 0
+            _cr  = getattr(_step_usage, "cache_read_input_tokens", 0) or 0
+            # claude-sonnet-4-6 pricing: $3/1M input, $15/1M output, $3.75/1M cache-write, $0.30/1M cache-read
+            step_cost = _in * 3e-6 + _out * 15e-6 + _cw * 3.75e-6 + _cr * 0.3e-6
+            total_cost_usd += step_cost
+            yield {
+                "type": "usage",
+                "step": step_num,
+                "input_tokens": _in,
+                "output_tokens": _out,
+                "cache_creation_tokens": _cw,
+                "cache_read_tokens": _cr,
+                "step_cost_usd": round(step_cost, 6),
+                "total_cost_usd": round(total_cost_usd, 6),
+            }
 
         m = _extract_first_json_object(_repair_json(raw))
         try:
