@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from scipy import stats
 from scipy.stats import rankdata as _rankdata, norm as _norm, chi2 as _chi2
 from statsmodels.stats.multitest import multipletests
@@ -175,6 +176,164 @@ def cross_dataset_de(datasets, groupA=None, groupB=None, deg_datasets=None,
         "min_effect_size_used": min_effect_size,
         "top_consistent_up":   [{k: v for k, v in x.items() if k != "per_dataset"} for x in entries if x["direction"] == "UP"][:topN],
         "top_consistent_down": [{k: v for k, v in x.items() if k != "per_dataset"} for x in entries if x["direction"] == "DOWN"][:topN],
+    }
+
+
+def meta_rank(datasets: list, deg_datasets: dict,
+              groupA: str, groupB: str,
+              mappings: dict = None) -> pd.Series:
+    """
+    Compute signed Stouffer Z meta-analysis ranking for GSEA input.
+    Positive Z = UP in groupA vs groupB.
+    Returns a pandas Series of gene→Z sorted descending.
+    Sources: raw expression datasets (weighted by sqrt(n)) + DEG tables (weight=1).
+    """
+    mappings = mappings or {}
+    # Accumulators: per-gene (sum of signed_z * weight, sum of weight^2)
+    acc = pd.DataFrame(columns=["sw", "w2"], dtype=float)
+
+    for ds in datasets:
+        expr = ds["expr"]
+        meta = ds["meta"]
+        gc = ds["group_col"]
+        resolved = meta[gc].apply(lambda g: resolve_group(g, mappings))
+        sA = [s for s in meta.index[resolved == groupA] if s in expr.columns]
+        sB = [s for s in meta.index[resolved == groupB] if s in expr.columns]
+        if len(sA) < 2 or len(sB) < 2:
+            continue
+        weight = float(np.sqrt(len(sA) + len(sB)))
+        _, p_raw = _mwu_cross(expr[sA].values, expr[sB].values)
+        lfc = expr[sA].mean(axis=1).values - expr[sB].mean(axis=1).values
+        p_c = np.clip(np.where(np.isnan(p_raw), 1.0, p_raw), 1e-300, 1.0)
+        z_i = _norm.ppf(1.0 - p_c / 2.0)
+        sw = np.sign(lfc) * z_i * weight
+        chunk = pd.DataFrame({"sw": sw, "w2": float(weight ** 2)}, index=expr.index)
+        acc = acc.add(chunk, fill_value=0.0)
+
+    for ds_name, ds in (deg_datasets or {}).items():
+        for comp in ds["comparisons"]:
+            a = resolve_group(comp["groupA"], mappings)
+            b = resolve_group(comp["groupB"], mappings)
+            if a == groupA and b == groupB:
+                direction = 1
+            elif a == groupB and b == groupA:
+                direction = -1
+            else:
+                continue
+            df = comp["df"]
+            p_col = "p" if "p" in df.columns else "adj_p"
+            p_c = df[p_col].clip(1e-300, 1.0).fillna(1.0).values
+            z_i = _norm.ppf(1.0 - p_c / 2.0)
+            sw = np.sign(df["logFC"].values * direction) * z_i
+            chunk = pd.DataFrame({"sw": sw, "w2": 1.0}, index=df.index)
+            acc = acc.add(chunk, fill_value=0.0)
+
+    if acc.empty:
+        return pd.Series(dtype=float)
+    stouffer = acc["sw"] / acc["w2"].pow(0.5).clip(lower=1e-9)
+    return stouffer.sort_values(ascending=False)
+
+
+def meta_gsea(datasets: list, deg_datasets: dict = None,
+              groupA: str = None, groupB: str = None,
+              mappings: dict = None,
+              min_size: int = 15, max_size: int = 500,
+              permutation_num: int = 200, topN: int = 10, **_) -> dict:
+    """
+    Meta-analysis GSEA: pool all datasets/DEG tables for a comparison via signed Stouffer Z,
+    then run gseapy.prerank against the GMT gene sets. Prefer this over per-file gsea_enrichment
+    for primary pathway characterisation of a group-pair comparison.
+    """
+    from .single import _load_gene_sets
+
+    if not groupA or not groupB:
+        return {"error": "groupA and groupB are required"}
+
+    mappings = mappings or {}
+    rnk = meta_rank(datasets, deg_datasets or {}, groupA, groupB, mappings=mappings)
+    if rnk.empty:
+        return {"error": f"No data found for {groupA!r} vs {groupB!r} across any dataset"}
+
+    # Count contributing sources
+    n_raw = sum(
+        1 for ds in datasets
+        if sum(1 for s in ds["meta"].index[
+            ds["meta"][ds["group_col"]].apply(lambda g: resolve_group(g, mappings)) == groupA
+        ] if s in ds["expr"].columns) >= 2
+        and sum(1 for s in ds["meta"].index[
+            ds["meta"][ds["group_col"]].apply(lambda g: resolve_group(g, mappings)) == groupB
+        ] if s in ds["expr"].columns) >= 2
+    )
+    n_deg = sum(
+        1 for ds in (deg_datasets or {}).values()
+        for comp in ds["comparisons"]
+        if {resolve_group(comp["groupA"], mappings), resolve_group(comp["groupB"], mappings)} == {groupA, groupB}
+    )
+    n_datasets = n_raw + n_deg
+
+    try:
+        gene_sets = _load_gene_sets()
+    except RuntimeError as e:
+        return {"error": str(e)}
+
+    try:
+        import gseapy
+        res = gseapy.prerank(
+            rnk=rnk,
+            gene_sets=gene_sets,
+            outdir=None,
+            min_size=min_size,
+            max_size=max_size,
+            permutation_num=permutation_num,
+            ascending=False,
+            no_plot=True,
+            verbose=False,
+            seed=42,
+            threads=1,
+        )
+    except Exception as e:
+        return {"error": f"gseapy.prerank failed: {e}"}
+
+    df_res = res.res2d.copy()
+    df_res["nes"] = pd.to_numeric(df_res["NES"], errors="coerce").fillna(0.0)
+    df_res["fdr"] = pd.to_numeric(df_res["FDR q-val"], errors="coerce").fillna(1.0)
+    df_res["pval"] = pd.to_numeric(df_res["NOM p-val"], errors="coerce").fillna(1.0)
+    df_res = df_res.sort_values("nes", ascending=False)
+
+    def _to_records(sub):
+        out = []
+        for _, row in sub.iterrows():
+            le = [g.strip() for g in str(row.get("Lead_genes", "")).split(";") if g.strip()][:5]
+            out.append({
+                "pathway": str(row["Term"]),
+                "nes": round(float(row["nes"]), 3),
+                "fdr": round(float(row["fdr"]), 4),
+                "pval": round(float(row["pval"]), 6),
+                "leading_edge": le,
+            })
+        return out
+
+    top_up   = _to_records(df_res[df_res["nes"] > 0].head(topN))
+    top_down = _to_records(df_res[df_res["nes"] < 0].tail(topN).iloc[::-1])
+
+    sig_up   = [r for r in top_up   if r["fdr"] < 0.25]
+    sig_down = [r for r in top_down if r["fdr"] < 0.25]
+    parts = []
+    if sig_up:
+        parts.append(f"UP: {sig_up[0]['pathway']} (NES={sig_up[0]['nes']:.2f}, FDR={sig_up[0]['fdr']:.4f})")
+    if sig_down:
+        parts.append(f"DOWN: {sig_down[0]['pathway']} (NES={sig_down[0]['nes']:.2f}, FDR={sig_down[0]['fdr']:.4f})")
+
+    return {
+        "comparison": f"{groupA} vs {groupB}",
+        "n_datasets_pooled": n_datasets,
+        "n_genes_ranked": len(rnk),
+        "n_sets_tested": len(df_res),
+        "n_significant_fdr25": int((df_res["fdr"] < 0.25).sum()),
+        "n_significant_fdr05": int((df_res["fdr"] < 0.05).sum()),
+        "top_enriched_up": top_up,
+        "top_enriched_down": top_down,
+        "interpretation": "; ".join(parts) if parts else "No significant enrichment at FDR<0.25",
     }
 
 

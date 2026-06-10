@@ -101,13 +101,15 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
     if deg_datasets:
         deg_tools_block = (
             "\nDEG TABLE TOOLS (available when DEG tables are uploaded):\n"
+            "- meta_gsea: {groupA, groupB, topN} \u2014 META-ANALYSIS GSEA (PRIMARY ENRICHMENT TOOL). "
+            "Pools ALL datasets/DEG tables for the comparison via signed Stouffer Z meta-ranking "
+            "(weights raw datasets by sqrt(n); DEG tables weight=1), then runs gseapy.prerank against the GMT. "
+            "Returns signed NES + FDR for top UP and DOWN enriched gene sets, plus n_datasets_pooled. "
+            "REQUIRED: call meta_gsea for EVERY group-pair comparison you characterise before concluding \u2014 "
+            "do not rely on per-file tools which are underpowered and miss distributed signals.\n"
             "- gsea_enrichment: {deg_dataset_name, groupA, groupB, rank_by, topN} \u2014 "
-            "pre-ranked GSEA against GMT gene sets. Ranks ALL genes by signed logFC "
-            "(rank_by=\"signed_logfc\", default) or signed \u2212log10(adj_p) (rank_by=\"signed_neg_log_p\"). "
-            "Returns signed NES + adj_p for UP-enriched and DOWN-enriched gene sets. "
-            "Unlike pathway_enrichment (ORA), detects distributed moderate-effect signals without a cutoff. "
-            "REQUIRED: call gsea_enrichment for EVERY group-pair comparison you characterise "
-            "\u2014 do not rely solely on pathway_enrichment which is cutoff-biased and misses immune/OXPHOS signals.\n"
+            "DIAGNOSTIC / QC ONLY: per-file GSEA (single DEG table). Use only to check heterogeneity "
+            "between files or to audit a single study; prefer meta_gsea for primary characterisation.\n"
             "- deg_voting: {groupA, groupB, adj_p_threshold, logfc_threshold, topN} \u2014 "
             "per-gene vote count across DEG tables: frequency + direction consistency\n"
             "- deg_biomarker_ranking: {groupA, groupB, adj_p_threshold, logfc_threshold, topN} \u2014 "
@@ -130,19 +132,21 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
     if deg_only:
         strategy = (
             "STRATEGY (DEG-only mode \u2014 adapt freely):\n"
-            "1. network_meta_analysis (no params) \u2014 run first to derive all indirect comparisons and establish the full group comparison landscape\n"
-            "2. gsea_enrichment \u2014 REQUIRED for every disease-vs-reference comparison you characterise; "
-            "call it BEFORE evaluating any pathway hypothesis; identifies both UP and DOWN enriched gene sets "
-            "including immune/MHC-II, inflammatory, OXPHOS, and proliferation programs that ORA misses\n"
-            "3. deg_voting to identify most consistently DE genes across tables\n"
-            "4. cross_dataset_de for meta-analysis p-values and Fisher-combined significance\n"
-            "5. pathway_enrichment for targeted ORA on specific curated gene lists (complements GSEA, does not replace it)\n"
+            "1. network_meta_analysis (no params) \u2014 run first to map the full comparison landscape\n"
+            "2. meta_gsea \u2014 REQUIRED for EVERY group-pair comparison you characterise; call BEFORE evaluating "
+            "any pathway hypothesis; pools all datasets via Stouffer Z so distributed signals reach FDR<0.05. "
+            "Each seed hypothesis S1..Sn already identifies the top signal \u2014 use meta_gsea to verify both "
+            "UP and DOWN axes for that comparison.\n"
+            "3. deg_voting to identify most consistently DE genes\n"
+            "4. cross_dataset_de for Fisher meta-analysis gene lists\n"
+            "5. pathway_enrichment for targeted ORA on specific curated gene lists (complementary to meta_gsea)\n"
             "6. deg_biomarker_ranking for composite biomarker candidates\n"
-            "7. deg_cooccurrence_network to find hub genes appearing together across tables\n"
+            "7. deg_cooccurrence_network to find hub genes\n"
             "8. deg_direction_comparison to compare two disease signatures \u2014 always check coverage; "
             "do NOT claim similarity when coverage < 0.5\n"
-            "9. execute_code for any custom computation on the DEG table data\n"
-            "10. DONE"
+            "9. gsea_enrichment for per-file QC/heterogeneity checks only\n"
+            "10. execute_code for custom computation\n"
+            "11. DONE"
         )
     else:
         strategy = (
@@ -230,7 +234,7 @@ IMPORTANT RULES FOR HYPOTHESIS TESTING:
 - Use execute_code only for analyses not covered by existing tools (e.g. custom visualizations, effect size calculations, novel metrics).
 - To investigate DE further, use the differential_expression tool (genome-wide) or cross_dataset_de \u2014 never a hand-picked gene list.
 - The expression data is already log-transformed (log2 scale, typical range 3\u201314). LogFC = mean(group_A) - mean(group_B) directly. Do NOT apply additional log2 transformation in execute_code \u2014 this would double-log the data and produce incorrect effect sizes.
-- MANDATORY RANKED ENRICHMENT: before concluding any characterisation of a group-pair comparison (disease vs reference), you MUST call gsea_enrichment on that comparison's DEG table. pathway_enrichment alone (ORA on a thresholded gene list) is insufficient \u2014 it is UP-axis biased and misses distributed immune, OXPHOS, and cell-cycle programs. If you have not called gsea_enrichment for a comparison, its pathway landscape is unknown \u2014 do not speculate.
+- MANDATORY RANKED ENRICHMENT: before concluding any characterisation of a group-pair comparison, you MUST call meta_gsea(groupA=..., groupB=...) for that comparison. pathway_enrichment and gsea_enrichment alone are insufficient \u2014 they are either ORA-biased or underpowered (single file). meta_gsea pools all sources via Stouffer Z meta-ranking and is the only tool with adequate power to detect distributed immune, OXPHOS, and cell-cycle programs. If you have not called meta_gsea for a comparison, its pathway landscape is unknown \u2014 do not speculate.
 - FORBIDDEN SIMILARITY CLAIM: a "similar", "identical", "concordant", or ">X% concordance" verdict between two groups is FORBIDDEN when (a) deg_direction_comparison returns coverage < 0.5, OR (b) gsea_enrichment shows divergent top pathways between those two groups. High shared-gene concordance on a small intersection (coverage < 0.5) is NOT evidence of overall biological similarity \u2014 the correct phrasing is "limited DE overlap; signatures are largely distinct".
 
 TOOL-SPECIFIC INTERPRETATION RULES:

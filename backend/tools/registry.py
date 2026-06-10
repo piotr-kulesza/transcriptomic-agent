@@ -5,6 +5,7 @@ from .single import (
 )
 from .cross import (
     cross_dataset_de, cross_dataset_correlation, invariant_axis, cross_dataset_rewiring,
+    meta_gsea,
 )
 from .deg import (
     deg_voting, deg_cooccurrence_network, deg_biomarker_ranking, deg_direction_comparison,
@@ -27,6 +28,7 @@ TOOLS = {
     "cross_dataset_correlation": cross_dataset_correlation,
     "invariant_axis":            invariant_axis,
     "cross_dataset_rewiring":    cross_dataset_rewiring,
+    "meta_gsea":                 meta_gsea,
     "deg_voting":                deg_voting,
     "deg_cooccurrence_network":  deg_cooccurrence_network,
     "deg_biomarker_ranking":     deg_biomarker_ranking,
@@ -39,7 +41,7 @@ CROSS_TOOL_NAMES = {
 }
 
 DEG_TOOL_NAMES = {
-    "gsea_enrichment",
+    "meta_gsea", "gsea_enrichment",
     "deg_voting", "deg_cooccurrence_network", "deg_biomarker_ranking", "deg_direction_comparison",
     "network_meta_analysis",
 }
@@ -64,6 +66,7 @@ def summarize_result(action: str, r: dict) -> str:
             "cross_dataset_correlation": lambda: f"replication min={r['min_replication']} | {r['interpretation']}",
             "invariant_axis":            lambda: f"invariant in {r['axis_consistent_in']} | {r['interpretation']}",
             "cross_dataset_rewiring":    lambda: f"{r['gene_pair']}: Δr={r['rewiring_magnitude']} | {r['interpretation']}",
+            "meta_gsea":                 lambda: r["interpretation"],
             "gsea_enrichment":           lambda: r["interpretation"],
             "deg_voting":                lambda: r["interpretation"],
             "deg_cooccurrence_network":  lambda: r["interpretation"],
