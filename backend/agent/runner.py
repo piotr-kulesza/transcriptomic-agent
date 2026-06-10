@@ -213,6 +213,9 @@ async def run_agent_loop(
     # ── Pre-analysis seeding ──────────────────────────────────────────────────
     loop = asyncio.get_event_loop()
     seeds, seed_summary, seed_data = await loop.run_in_executor(None, lambda: generate_seeds(datasets, mappings=mappings, deg_datasets=deg_datasets))
+    # Auto-raise budget so every comparison seed can be evaluated before DONE
+    n_comparison_seeds = sum(1 for s in seeds if s.get("seeded_by") == "auto_gsea")
+    max_hypotheses = max(max_hypotheses, n_comparison_seeds)
     max_steps = max_hypotheses * 5  # safety cap: generous budget per hypothesis
     system_prompt = build_system_prompt(datasets, len(common_genes), seed_summary=seed_summary, deg_datasets=deg_datasets, max_hypotheses=max_hypotheses)
     if mappings:
