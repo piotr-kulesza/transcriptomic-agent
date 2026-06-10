@@ -272,9 +272,14 @@ async def run_agent_loop(
 
         yield {"type": "thinking", "text": f"Agent thinking... ({evaluated}/{max_hypotheses} hypotheses evaluated)"}
 
-        # Apply prompt caching: mark at most 3 messages as cacheable (system prompt uses 1 of 4 allowed slots)
-        cacheable = messages[:-2]
-        for msg in cacheable[-3:]:
+        # Apply prompt caching: clear all existing marks, then mark last 3 cacheable messages.
+        # System prompt uses 1 of 4 allowed cache_control slots, leaving 3 for messages.
+        # Marks must be cleared each step because they accumulate in-place across iterations.
+        for msg in messages:
+            if isinstance(msg["content"], list):
+                for block in msg["content"]:
+                    block.pop("cache_control", None)
+        for msg in messages[:-2][-3:]:
             if isinstance(msg["content"], list):
                 msg["content"][-1]["cache_control"] = {"type": "ephemeral"}
             elif isinstance(msg["content"], str):
