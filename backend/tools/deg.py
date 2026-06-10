@@ -310,6 +310,8 @@ def deg_direction_comparison(datasets: list, deg_datasets: dict = None,
     shared = set(genesA) & set(genesB)
     only_A = set(genesA) - shared
     only_B = set(genesB) - shared
+    n_union_significant = len(shared) + len(only_A) + len(only_B)
+    coverage = round(len(shared) / n_union_significant, 3) if n_union_significant > 0 else 0.0
 
     concordant, discordant = [], []
     for gene in shared:
@@ -338,12 +340,19 @@ def deg_direction_comparison(datasets: list, deg_datasets: dict = None,
     label_A = f"{comparisonA_groupA} vs {comparisonA_groupB}"
     label_B = f"{comparisonB_groupA} vs {comparisonB_groupB}"
 
+    coverage_warn = (
+        " LOW COVERAGE: concordance stats are unreliable — most DE genes are comparison-specific;"
+        " do NOT conclude similarity or identity between these groups."
+        if coverage < 0.5 else ""
+    )
     return {
         "comparison_A": label_A,
         "comparison_B": label_B,
         "n_genes_A": len(genesA),
         "n_genes_B": len(genesB),
         "n_shared": len(shared),
+        "n_union_significant": n_union_significant,
+        "coverage": coverage,
         "n_concordant": len(concordant),
         "n_discordant": len(discordant),
         "n_specific_A": len(only_A),
@@ -353,10 +362,12 @@ def deg_direction_comparison(datasets: list, deg_datasets: dict = None,
         "specific_to_A": only_A_top,
         "specific_to_B": only_B_top,
         "interpretation": (
-            f"{len(concordant)} concordant, {len(discordant)} discordant genes. "
-            f"Top concordant: {concordant[0]['gene']} "
-            f"(logFC_A={concordant[0]['logFC_A']}, logFC_B={concordant[0]['logFC_B']})"
-            if concordant else "No shared genes between comparisons"
+            f"{len(concordant)} concordant, {len(discordant)} discordant genes; "
+            f"coverage={coverage} ({len(shared)}/{n_union_significant} shared/union significant)."
+            + coverage_warn
+            + (f" Top concordant: {concordant[0]['gene']} "
+               f"(logFC_A={concordant[0]['logFC_A']}, logFC_B={concordant[0]['logFC_B']})"
+               if concordant else " No shared genes between comparisons.")
         ),
     }
 
