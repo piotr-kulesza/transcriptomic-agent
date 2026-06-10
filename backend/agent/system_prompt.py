@@ -49,10 +49,12 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
             "- gene_expression_by_group: {datasetName, genes[]}\n"
             "- nonlinear_rule: {datasetName, geneHigh, geneLow, targetGroup}\n"
             "- contextual_modules: {datasetName, contextGene, topN}\n"
-            "- pathway_enrichment: {genes[], deg_dataset_name} \u2014 enrichment against Hallmarks/KEGG. "
+            "- pathway_enrichment: {genes[], deg_dataset_name, collection_prefix} \u2014 hypergeometric ORA against gene sets (Hallmarks/KEGG/GO/Reactome). "
             "Two ways to provide genes: (1) genes[] \u2014 pass sig_genes_up or sig_genes_down from a differential_expression result; "
             "(2) deg_dataset_name \u2014 ONLY for separately uploaded DEG table files (listed under DEG DATASETS above); "
-            "do NOT use deg_dataset_name for raw expression datasets\n"
+            "do NOT use deg_dataset_name for raw expression datasets. "
+            "Optional collection_prefix filters to a sub-collection (e.g. 'HALLMARK_', 'GOBP_', 'KEGG_', 'REACTOME_'). "
+            "First-class alternative to meta_gsea for targeted ORA on a specific set of genes or collection.\n"
             "- batch_detection: {datasetName, genes[]} \u2014 is the axis a batch artifact?\n"
             "- subgroup_discovery: {datasetName, group} \u2014 subgroups within a group (PCA + KMeans)\n"
             "- gene_network_hub: {datasetName, topN, corrThreshold} \u2014 co-expression network hubs\n"
@@ -101,10 +103,12 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
     if deg_datasets:
         deg_tools_block = (
             "\nDEG TABLE TOOLS (available when DEG tables are uploaded):\n"
-            "- meta_gsea: {groupA, groupB, topN} \u2014 META-ANALYSIS GSEA (PRIMARY ENRICHMENT TOOL). "
+            "- meta_gsea: {groupA, groupB, topN, collection_prefix} \u2014 META-ANALYSIS GSEA (PRIMARY ENRICHMENT TOOL). "
             "Pools ALL datasets/DEG tables for the comparison via signed Stouffer Z meta-ranking "
             "(weights raw datasets by sqrt(n); DEG tables weight=1), then runs gseapy.prerank against the GMT. "
             "Returns signed NES + FDR for top UP and DOWN enriched gene sets, plus n_datasets_pooled. "
+            "Optional collection_prefix filters gene sets to a sub-collection "
+            "(e.g. 'HALLMARK_', 'GOBP_', 'KEGG_', 'REACTOME_', 'GOMF_') \u2014 omit to test all collections. "
             "REQUIRED: call meta_gsea for EVERY group-pair comparison you characterise before concluding \u2014 "
             "do not rely on per-file tools which are underpowered and miss distributed signals.\n"
             "- gsea_enrichment: {deg_dataset_name, groupA, groupB, rank_by, topN} \u2014 "
@@ -173,8 +177,8 @@ Common genes across all datasets: {common_genes_count}
 
 {cross_header}
 - cross_dataset_de: {{groupA, groupB, topN}} \u2014 automatically includes any uploaded DEG datasets matching the comparison
-- pathway_enrichment: {{genes[], deg_dataset_name}} \u2014 enrichment against Hallmarks/KEGG; pass sig_genes_up/sig_genes_down from differential_expression, or use deg_dataset_name to auto-extract significant genes from an uploaded DEG table file (NOT a raw expression dataset)
-  IMPORTANT: pathway_enrichment accepts either (a) genes=[list of gene symbols] \u2014 use this for custom gene lists, or (b) deg_dataset_name='DEG N' \u2014 use this to auto-extract significant genes from an uploaded DEG table. Never pass deg_dataset_name when you already have a gene list from a previous tool call \u2014 use genes= instead. If both are passed, genes takes priority and deg_dataset_name is ignored.
+- pathway_enrichment: {{genes[], deg_dataset_name, collection_prefix}} \u2014 hypergeometric ORA against gene sets (Hallmarks/KEGG/GO/Reactome). Pass genes=[list] or deg_dataset_name to auto-extract significant genes from an uploaded DEG table. Optional collection_prefix filters to one sub-collection (e.g. 'HALLMARK_', 'GOBP_', 'KEGG_', 'REACTOME_', 'GOMF_'). First-class alternative to meta_gsea for targeted ORA.
+  IMPORTANT: (a) genes=[list] \u2014 custom gene lists; (b) deg_dataset_name='DEG N' \u2014 auto-extract from uploaded DEG table. Never pass deg_dataset_name when you already have a gene list. If both passed, genes takes priority.
 {extra_cross_tools}
 {deg_tools_block}
 
@@ -203,6 +207,12 @@ HYPOTHESIS VERDICT CRITERIA \u2014 apply strictly:
 - "rejected": adj_p > 0.2 or effect direction inconsistent across datasets/tools
 - "uncertain": everything else \u2014 including: large effect size without adj_p < 0.05, small n (< 5 per group), only one tool tested, promising but unreplicated. When in doubt use "uncertain".
 
+EXTRA RIGOR FOR AGENT-PROPOSED HYPOTHESES (H1..Hn) \u2014 stricter than for seeds:
+- CONVERGENCE: "confirmed" requires \u22652 independent methods agreeing (e.g. meta_gsea + pathway_enrichment ORA, or enrichment + deg_voting, or meta_gsea + network_meta_analysis). A single meta_gsea alone is NOT sufficient for CONFIRMED \u2014 corroborate with a second orthogonal method.
+- REPLICATION: effect must be present in \u22652 datasets or in the pooled meta-analysis (meta_gsea n_datasets_pooled >= 2). Single-study evidence supports only UNCERTAIN.
+- MULTIPLE-TESTING HONESTY: meta_gsea and gsea_enrichment each scan thousands of gene sets. A high NES alone is not confirmation. Explicitly acknowledge the scanning context: "top of ~N gene sets tested." Judge significance strictly on FDR q-value, not nominal p or NES magnitude.
+- EXECUTE_CODE AT THE SAME BAR: self-written analyses may not declare significance without FDR control and replication. An execute_code result not pre-specified by a seed is hypothesis-generating only, not confirming.
+
 HYPOTHESIS EVALUATION RULES:
 - A seed hypothesis S1..Sn should be marked CONFIRMED if:
   (1) the comparison shows statistically significant DE genes (adj_p<0.05),
@@ -223,6 +233,14 @@ HYPOTHESIS EVALUATION RULES:
   evidence. UNCERTAIN means evidence is mixed or insufficient.
   PENDING means no evidence collected yet \u2014 it should not persist
   beyond the step where evidence was gathered.
+
+HYPOTHESIS TIERS \u2014 floor vs. novelty dial:
+The per-comparison meta-GSEA seeds S1..Sn are a COVERAGE FLOOR: one per unique group-pair comparison. They guarantee every comparison is characterized before DONE.
+Once every seed has been evaluated, ALL remaining budget must target genuinely new questions \u2014 not re-runs of the floor:
+- Cross-cutting: propose hypotheses that span \u22652 comparisons (e.g. what is shared vs. specific across groups; monotonic gradient ordering across groups; what one group shares with a second but not a third).
+- Method diversity: each new H-hypothesis must use a different primary method from the previous H-hypothesis (meta_gsea on a specific collection \u2192 deg_voting \u2192 network_meta_analysis \u2192 deg_direction_comparison \u2192 execute_code for a custom metric, etc.). Do NOT call meta_gsea on a comparison that already has a confirmed/rejected/uncertain seed without adding a new angle (different collection_prefix, grouped contrast, reversed comparison).
+- Question types available: subtype-specificity (is a signal unique to one group?), gradient (does effect size order groups A > B > C?), within-group heterogeneity (subgroup_discovery), network rewiring (cross_dataset_rewiring), mechanistic link (does finding X explain finding Y?).
+- Never restate, re-test, or re-phrase a seed or a previous hypothesis with the same parameters.
 
 NETWORK META-ANALYSIS PREFERENCE:
 - When network_meta_analysis results are available for a group pair, PREFER them over single-study direct comparisons for hypothesis evidence — they integrate indirect evidence across the full comparison network and are more robust to study-specific noise.
