@@ -13,24 +13,105 @@ from scipy.stats import mannwhitneyu as mwu
 from statsmodels.stats.multitest import multipletests
 
 from ..tools.cross import cross_dataset_de, resolve_group
-
-# Well-established immune/inflammatory marker genes used to detect immune signal in DE results
-_IMMUNE_MARKERS: frozenset = frozenset({
-    "HLA-DRA", "HLA-DRB1", "HLA-DRB5", "HLA-DQA1", "HLA-DQB1", "HLA-DPA1", "HLA-DPB1",
-    "CD74", "FCGR3A", "TYROBP", "LYZ", "AIF1", "PTPRC", "CD68", "CD163",
-    "IFIT1", "IFIT2", "IFIT3", "MX1", "ISG15", "OAS1", "OAS2", "RSAD2",
-    "CCL2", "CCL5", "CXCL10", "IL1B", "TNF", "IFNG", "IL6", "STAT1",
-})
+from ..tools.single import _gsea_compute_es, _load_gene_sets
 
 
-def _is_peritoneal_like(name: str) -> bool:
-    n = name.lower().replace("_", " ").replace("-", " ")
-    return "peritoneal" in n or n.strip() == "pe" or " pe " in f" {n} "
+def _top_gsea_hit(df_genes: pd.DataFrame, n_perm: int = 100,
+                  min_size: int = 15, max_size: int = 500) -> dict | None:
+    """
+    Run pre-ranked GSEA (signed logFC ranking) on a gene-indexed DataFrame.
+    Returns the top gene set by |NES| as {pathway, nes, adj_p, direction, leading_edge},
+    or None when GMT_FILE is not configured, genes are too few, or no set passes the size filter.
+    Failures are swallowed silently so seeding always completes.
+    """
+    try:
+        gene_sets = _load_gene_sets()
+    except RuntimeError:
+        return None
 
+    df = df_genes.copy().dropna(subset=["logFC"])
+    if "adj_p" not in df.columns:
+        df["adj_p"] = 1.0
+    df["adj_p"] = df["adj_p"].clip(lower=1e-300).fillna(1.0)
+    df = df.sort_values("logFC", ascending=False)
+    genes_upper = [g.upper() for g in df.index.tolist()]
+    rank_scores = df["logFC"].values.astype(float)
+    gene_to_pos = {g: i for i, g in enumerate(genes_upper)}
+    N = len(genes_upper)
+    if N < 20:
+        return None
 
-def _is_healthy_like(name: str) -> bool:
-    n = name.lower()
-    return any(kw in n for kw in ["healthy", "normal", "eutopic", "control", "ctrl"])
+    filtered: dict = {}
+    for gs_name, members in gene_sets.items():
+        idx = np.array([gene_to_pos[g.upper()] for g in members if g.upper() in gene_to_pos])
+        if min_size <= len(idx) <= max_size:
+            filtered[gs_name] = idx
+    if not filtered:
+        return None
+
+    obs_es: dict = {}
+    size_groups: dict = {}
+    for name, idx in filtered.items():
+        obs_es[name] = _gsea_compute_es(rank_scores, idx)
+        size_groups.setdefault(len(idx), []).append(name)
+
+    rng = np.random.default_rng(0)
+    null_per_size: dict = {}
+    for sz in size_groups:
+        null_per_size[sz] = np.array([
+            _gsea_compute_es(rank_scores, rng.choice(N, size=sz, replace=False))
+            for _ in range(n_perm)
+        ])
+
+    records = []
+    for name, es in obs_es.items():
+        sz = len(filtered[name])
+        null_arr = null_per_size[sz]
+        pos_null = null_arr[null_arr > 0]
+        neg_null = null_arr[null_arr < 0]
+        if es >= 0:
+            mean_pos = pos_null.mean() if pos_null.size > 0 else 1.0
+            nes = es / mean_pos if mean_pos > 0 else float(es)
+            raw_p = float((pos_null >= es).sum() + 1) / (pos_null.size + 1) if pos_null.size else 1.0
+        else:
+            mean_neg = abs(neg_null.mean()) if neg_null.size > 0 else 1.0
+            nes = es / mean_neg if mean_neg > 0 else float(es)
+            raw_p = float((neg_null <= es).sum() + 1) / (neg_null.size + 1) if neg_null.size else 1.0
+        records.append({"pathway": name, "nes": nes, "p": raw_p})
+
+    if not records:
+        return None
+
+    df_r = pd.DataFrame(records)
+    _, adj_p_arr, _, _ = multipletests(df_r["p"].values, method="fdr_bh")
+    df_r["adj_p"] = adj_p_arr
+    df_r["abs_nes"] = df_r["nes"].abs()
+    sig = df_r[df_r["adj_p"] < 0.25].sort_values("abs_nes", ascending=False)
+    top = sig.iloc[0] if not sig.empty else df_r.sort_values("abs_nes", ascending=False).iloc[0]
+
+    top_name = str(top["pathway"])
+    top_idx = filtered[top_name]
+    top_es = obs_es[top_name]
+    mask = np.zeros(N, dtype=bool)
+    mask[top_idx] = True
+    abs_r = np.abs(rank_scores)
+    nr = abs_r[mask].sum() or float(len(top_idx))
+    rs = np.cumsum(np.where(mask, abs_r / nr, -1.0 / (N - len(top_idx))))
+    if top_es >= 0:
+        peak = int(np.argmax(rs))
+        le_pos = sorted(top_idx[top_idx <= peak].tolist())[:5]
+    else:
+        trough = int(np.argmin(rs))
+        le_pos = sorted(top_idx[top_idx >= trough].tolist())[:5]
+    leading_edge = [genes_upper[i] for i in le_pos]
+
+    return {
+        "pathway": top_name,
+        "nes": round(float(top["nes"]), 3),
+        "adj_p": round(float(top["adj_p"]), 4),
+        "direction": "UP" if float(top["nes"]) >= 0 else "DOWN",
+        "leading_edge": leading_edge,
+    }
 
 
 def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = None) -> tuple[list[dict], str, dict]:
@@ -162,85 +243,81 @@ def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = N
                     })
                     seed_id += 1
 
+                # For every comparison, also run ranked enrichment and seed the top hit
+                df_indexed = df.set_index("gene")[["logFC", "adj_p"]]
+                gsea_hit = _top_gsea_hit(df_indexed)
+                if gsea_hit:
+                    seeds.append({
+                        "id": f"S{seed_id}",
+                        "text": (
+                            f"{ds_name} — {group_a} vs {group_b}: "
+                            f"top ranked-enrichment signal is {gsea_hit['pathway']} "
+                            f"({gsea_hit['direction']}, NES={gsea_hit['nes']}, adj_p={gsea_hit['adj_p']}). "
+                            f"Investigate the full pathway landscape with pathway_enrichment or gsea_enrichment."
+                        ),
+                        "status": "pending",
+                        "evidence": [],
+                        "proposed_at": 0,
+                        "seeded_by": "auto_gsea",
+                        "genes": gsea_hit["leading_edge"],
+                    })
+                    seed_id += 1
+                    summary_lines.append(
+                        f"  → GSEA seed (S{seed_id - 1}): "
+                        f"{gsea_hit['direction']} {gsea_hit['pathway']} NES={gsea_hit['nes']}"
+                    )
+
         except Exception as e:
             summary_lines.append(f"  {ds_name}: seeder error — {e}")
 
-    # ── 2. DEG table summary — generate GSEA-prompting and immune-signal seeds ──
+    # ── 2. DEG table summary — data-driven ranked-enrichment seeds ──────
     for ds_name, ds in _deg.items():
         try:
             for comp in ds["comparisons"]:
                 df = comp["df"]
                 sig = df[(df["adj_p"] < 0.05) & (df["logFC"].abs() > 0.5)]
                 n_sig = len(sig)
-                top_up   = sig[sig["logFC"] > 0].sort_values("adj_p").head(10).index.tolist()
-                top_down = sig[sig["logFC"] < 0].sort_values("adj_p").head(10).index.tolist()
+                top_up   = sig[sig["logFC"] > 0].sort_values("adj_p").head(3).index.tolist()
+                top_down = sig[sig["logFC"] < 0].sort_values("adj_p").head(3).index.tolist()
                 summary_lines.append(
                     f"  {ds_name} — {comp['groupA']} vs {comp['groupB']}: {n_sig} DE genes"
-                    + (f", top UP: {', '.join(top_up[:3])}" if top_up else "")
-                    + (f", top DOWN: {', '.join(top_down[:3])}" if top_down else "")
+                    + (f", top UP: {', '.join(top_up)}" if top_up else "")
+                    + (f", top DOWN: {', '.join(top_down)}" if top_down else "")
                 )
                 seed_data["per_dataset_de"].append({
                     "dataset": ds_name,
                     "groupA": comp["groupA"],
                     "groupB": comp["groupB"],
                     "n_sig": n_sig,
-                    "top_up": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_up[:3]],
-                    "top_down": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_down[:3]],
+                    "top_up": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_up],
+                    "top_down": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_down],
                 })
 
                 gA, gB = comp["groupA"], comp["groupB"]
 
-                # Detect immune/inflammatory signal in top UP genes
-                immune_hit = {g.upper() for g in top_up} & _IMMUNE_MARKERS
-                is_pe_vs_healthy = (
-                    (_is_peritoneal_like(gA) and _is_healthy_like(gB)) or
-                    (_is_peritoneal_like(gB) and _is_healthy_like(gA))
-                )
-
-                if is_pe_vs_healthy or immune_hit:
-                    detected_note = (
-                        f"Immune markers detected in top UP genes: {', '.join(sorted(immune_hit))}. "
-                        if immune_hit else ""
-                    )
+                # Run ranked enrichment and seed the top hit — identical treatment for every comparison
+                gsea_hit = _top_gsea_hit(comp["df"])
+                if gsea_hit:
                     seeds.append({
                         "id": f"S{seed_id}",
                         "text": (
-                            f"{gA} vs {gB} ({ds_name}) shows immune/inflammatory signal. "
-                            + detected_note +
-                            f"Hypothesis: this comparison is enriched for allograft rejection, "
-                            f"MHC-II antigen presentation, interferon response, and inflammatory pathways. "
-                            f"REQUIRED: test with gsea_enrichment(deg_dataset_name='{ds_name}', "
-                            f"groupA='{gA}', groupB='{gB}') before evaluating."
-                        ),
-                        "status": "pending",
-                        "evidence": [],
-                        "proposed_at": 0,
-                        "seeded_by": "auto_immune",
-                        "genes": list(immune_hit)[:5] + [g for g in top_up[:5] if g.upper() not in immune_hit],
-                    })
-                    seed_id += 1
-                    summary_lines.append(
-                        f"  → Immune signal seeded (S{seed_id - 1}): {', '.join(sorted(immune_hit)) or 'PE-like group'}"
-                    )
-
-                # For every comparison with substantial DE signal, seed a GSEA-prompting hypothesis
-                # (skip if already handled by immune seed above)
-                elif n_sig >= 50:
-                    seeds.append({
-                        "id": f"S{seed_id}",
-                        "text": (
-                            f"{gA} vs {gB} ({ds_name}): {n_sig} DE genes. "
+                            f"{gA} vs {gB} ({ds_name}): "
+                            f"top ranked-enrichment signal is {gsea_hit['pathway']} "
+                            f"({gsea_hit['direction']}, NES={gsea_hit['nes']}, adj_p={gsea_hit['adj_p']}). "
                             f"Use gsea_enrichment(deg_dataset_name='{ds_name}', "
-                            f"groupA='{gA}', groupB='{gB}') to characterise the full pathway landscape "
-                            f"(UP and DOWN axes) without relying on arbitrary cutoffs."
+                            f"groupA='{gA}', groupB='{gB}') to characterise the full pathway landscape."
                         ),
                         "status": "pending",
                         "evidence": [],
                         "proposed_at": 0,
                         "seeded_by": "auto_gsea",
-                        "genes": top_up[:5] + top_down[:5],
+                        "genes": gsea_hit["leading_edge"],
                     })
                     seed_id += 1
+                    summary_lines.append(
+                        f"  → GSEA seed (S{seed_id - 1}): "
+                        f"{gsea_hit['direction']} {gsea_hit['pathway']} NES={gsea_hit['nes']}"
+                    )
 
         except Exception as e:
             summary_lines.append(f"  {ds_name}: DEG summary error — {e}")
