@@ -288,7 +288,7 @@ async def run_agent_loop(
         raw = ""
         try:
             async with client.messages.stream(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=16000,
                 temperature=temperature,
                 system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
