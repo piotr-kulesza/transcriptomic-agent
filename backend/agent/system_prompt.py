@@ -192,8 +192,15 @@ Manage hypotheses via the hypothesis_action field:
 Each step should either test an existing hypothesis (evaluate after result) or propose a new one.
 Do not propose and evaluate a hypothesis in the same step.
 Hypotheses must be specific and falsifiable.
-Your goal is to evaluate {max_hypotheses} hypotheses. Once you have evaluated that many (each confirmed/rejected/uncertain), call DONE immediately.
-Do NOT call DONE while you have fewer than {max_hypotheses} evaluated hypotheses. If you have already reached {max_hypotheses} evaluated, call DONE even if other hypotheses remain PENDING.
+
+HYPOTHESIS ID CONTRACT \u2014 CRITICAL:
+- Every hypothesis has an ID shown in the HYPOTHESES list in your context (e.g. S1, S2, H1, H2).
+- ONLY use IDs that appear in that list. NEVER invent IDs (H18, H19, etc.) that are not shown.
+- To evaluate a hypothesis: first see its ID in the list, then use that exact ID in hypothesis_action.
+- If you want to record a new finding: PROPOSE it first (get its assigned id), then in a later step evaluate that assigned id.
+- Using a non-existent ID in evaluate is an error. The runner will tell you the valid IDs if you make this mistake.
+
+Your goal is to evaluate {max_hypotheses} hypotheses (upper bound). DONE also unlocks when all comparison-floor seeds are resolved AND the last 3 proposals are all redundant with existing findings \u2014 so you may finish sooner if novelty is exhausted.
 
 FORMAT (strict JSON, nothing else \u2014 fields MUST appear in this exact order):
 {{"action":"tool_name","params":{{...}},"hypothesis_action":{{"type":"propose","text":"...","genes":["GENE1"]}} or {{"type":"evaluate","hypothesis_id":"H1","verdict":"confirmed","reasoning":"..."}} or null,"thought":"..."}}

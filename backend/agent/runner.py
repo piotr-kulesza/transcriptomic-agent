@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+from collections import deque
 from datetime import datetime
 from typing import AsyncGenerator
 
@@ -191,6 +192,120 @@ def _write_report(datasets: list, seed_summary: str, seed_data: dict, steps: lis
     return path
 
 
+# ── Evidence gating helpers ──────────────────────────────────────────────────
+
+# Method family mapping — multiple calls in the same family count as ONE for convergence.
+# Two meta_gsea calls with different collection_prefix = 1 family (enrichment_ranked), not 2.
+_METHOD_FAMILY: dict = {
+    "meta_gsea":                "enrichment_ranked",
+    "gsea_enrichment":          "enrichment_ranked",
+    "pathway_enrichment":       "enrichment_ora",
+    "deg_voting":               "deg_replication",
+    "deg_biomarker_ranking":    "deg_replication",
+    "cross_dataset_de":         "deg_replication",
+    "invariant_axis":           "deg_replication",
+    "differential_expression":  "deg_replication",
+    "network_meta_analysis":    "network",
+    "cross_dataset_rewiring":   "network",
+    "gene_network_hub":         "network",
+    "deg_cooccurrence_network": "network",
+    "deg_direction_comparison": "direction",
+    "subgroup_discovery":       "subgroup",
+    "execute_code":             "custom",
+}
+
+
+def _extract_evidence_meta(action: str, result: dict) -> tuple:
+    """Return (n_datasets, best_fdr) from a tool result for evidence gating."""
+    n_datasets, best_fdr = 1, None
+    if not isinstance(result, dict) or result.get("error"):
+        return n_datasets, best_fdr
+    if action == "meta_gsea":
+        n_datasets = int(result.get("n_datasets_pooled", 1))
+        fdrs = [r.get("fdr", 1.0) for r in result.get("top_enriched_up", []) + result.get("top_enriched_down", [])]
+        best_fdr = float(min(fdrs)) if fdrs else None
+    elif action == "gsea_enrichment":
+        ps = [r.get("adj_p", 1.0) for r in result.get("top_enriched_up", []) + result.get("top_enriched_down", [])]
+        best_fdr = float(min(ps)) if ps else None
+    elif action == "pathway_enrichment":
+        ps = [r.get("adj_p", 1.0) for r in result.get("top_enriched", [])]
+        best_fdr = float(min(ps)) if ps else None
+    elif action == "cross_dataset_de":
+        n_datasets = len(result.get("datasets_used", [])) or 1
+        fps = [r.get("fisher_adj_p", 1.0) for r in result.get("top_consistent_up", []) + result.get("top_consistent_down", [])]
+        best_fdr = float(min(fps)) if fps else None
+    elif action in ("deg_voting", "deg_biomarker_ranking", "deg_cooccurrence_network"):
+        n_datasets = int(result.get("n_comparisons", 1))
+    elif action == "invariant_axis":
+        n_datasets = int(result.get("n_datasets", 1))
+        bps = [g.get("p_bootstrap", 1.0) for g in result.get("top_invariant_genes", [])[:5]]
+        best_fdr = float(min(bps)) if bps else None
+    elif action == "differential_expression":
+        top = result.get("top_upregulated", []) + result.get("top_downregulated", [])
+        ps = [g.get("adj_p") for g in top if g.get("adj_p") is not None]
+        best_fdr = float(min(ps)) if ps else None
+    elif action == "network_meta_analysis":
+        n_datasets = int(result.get("n_direct_edges", 1))
+    return n_datasets, best_fdr
+
+
+def _check_confirmed_gate(hypothesis: dict) -> tuple:
+    """Return (can_confirm, issues). Requires ≥2 distinct method families, ≥2 datasets, FDR<0.05."""
+    evidence = hypothesis.get("evidence", [])
+    families = {e.get("method_family") for e in evidence if e.get("method_family")}
+    max_ds = max((e.get("n_datasets", 1) for e in evidence), default=1)
+    fdrs = [e["best_fdr"] for e in evidence if e.get("best_fdr") is not None]
+    best = min(fdrs) if fdrs else 1.0
+    issues = []
+    if len(families) < 2:
+        names = ", ".join(sorted(families)) or "none"
+        issues.append(
+            f"convergence: only 1 method family ({names}); need ≥2 distinct families "
+            f"(e.g. enrichment_ranked+enrichment_ora, or enrichment_ranked+deg_replication). "
+            f"Note: two meta_gsea calls with different collection_prefix = still ONE family."
+        )
+    if max_ds < 2:
+        issues.append(f"replication: max datasets={max_ds}; need n_datasets≥2 or n_datasets_pooled≥2")
+    if best >= 0.05:
+        fdr_str = f"{best:.4f}" if fdrs else "not recorded"
+        issues.append(f"significance: best FDR={fdr_str}; need FDR<0.05 from at least one method")
+    return (not issues), issues
+
+
+def _check_rejected_gate(hypothesis: dict) -> tuple:
+    """Return (can_reject, issues). Requires ≥1 significant result or ≥2 pieces of evidence."""
+    evidence = hypothesis.get("evidence", [])
+    if not evidence:
+        return False, ["no evidence collected; mark uncertain or gather evidence first"]
+    fdrs = [e["best_fdr"] for e in evidence if e.get("best_fdr") is not None]
+    if (fdrs and min(fdrs) < 0.05) or len(evidence) >= 2:
+        return True, []
+    fdr_str = f"{min(fdrs):.4f}" if fdrs else "not recorded"
+    return False, [
+        f"insufficient evidence for rejection (best FDR={fdr_str}, n_evidence=1); "
+        "need FDR<0.05 or ≥2 evidence items — mark uncertain instead"
+    ]
+
+
+def _jaccard(a: set, b: set) -> float:
+    if not a or not b:
+        return 0.0
+    u = len(a | b)
+    return len(a & b) / u if u > 0 else 0.0
+
+
+def _is_novel(new_genes: list, resolved: list, threshold: float = 0.5) -> bool:
+    """True if new_genes is sufficiently distinct from every resolved hypothesis's gene set."""
+    new_set = {g.upper() for g in new_genes}
+    if not new_set:
+        return True
+    for h in resolved:
+        existing = {g.upper() for g in h.get("genes", [])}
+        if existing and _jaccard(new_set, existing) >= threshold:
+            return False
+    return True
+
+
 async def run_agent_loop(
     datasets: list,
     max_hypotheses: int,
@@ -232,6 +347,7 @@ async def run_agent_loop(
     last_call: tuple = None                 # (action, params_json) of previous step
     once_only_called: set = set()           # tools that may only be called once per run
     total_cost_usd: float = 0.0             # accumulated API cost for this run
+    novelty_window: deque = deque(maxlen=3) # True=novel, False=redundant; last 3 agent proposals
     _ONCE_ONLY = {"cross_dataset_de"}       # tools restricted to a single call per run
     # When no raw expression datasets are loaded, only DEG-compatible tools may run
     _deg_only = len(datasets) == 0 and bool(deg_datasets)
@@ -250,9 +366,15 @@ async def run_agent_loop(
             "Discoveries:\n" + "\n".join(f"- [{d['action']}] {d['summary']}" for d in discoveries[-8:])
             if discoveries else "First step."
         )
+        hypo_lines = []
+        for h in hypotheses:
+            ev = len(h.get("evidence", []))
+            short = h["text"][:80] + ("…" if len(h["text"]) > 80 else "")
+            ev_tag = f", {ev}ev" if ev else ""
+            hypo_lines.append(f"  {h['id']} [{h['status'].upper()}{ev_tag}]: {short}")
         hypo_summary = (
-            "\nHYPOTHESES:\n" + "\n".join(f"  [{h['id']}][{h['status'].upper()}] {h['text']}" for h in hypotheses)
-            if hypotheses else ""
+            "\nHYPOTHESES (use these exact IDs — never invent IDs):\n" + "\n".join(hypo_lines)
+            if hypo_lines else ""
         )
 
         summary_block = f"{discovery_summary}{hypo_summary}"
@@ -381,10 +503,11 @@ async def run_agent_loop(
         # Process propose BEFORE tool call
         if isinstance(hypo_action, dict) and hypo_action.get("type") == "propose" and hypo_action.get("text"):
             hypo_counter += 1
+            new_genes = hypo_action.get("genes", [])
             h = {
                 "id": f"H{hypo_counter}",
                 "text": hypo_action["text"],
-                "genes": hypo_action.get("genes", []),   # optional list of genes the hypothesis is about
+                "genes": new_genes,
                 "status": "pending",
                 "evidence": [],
                 "proposed_at": step_num,
@@ -392,25 +515,47 @@ async def run_agent_loop(
             }
             hypotheses.append(h)
             yield {"type": "hypothesis_propose", "hypothesis": dict(h)}
+            # Track novelty: compare gene set to already-resolved hypotheses
+            resolved_so_far = [x for x in hypotheses[:-1] if x["status"] != "pending"]
+            novelty_window.append(_is_novel(new_genes, resolved_so_far))
 
         loop = asyncio.get_event_loop()
 
         if action == "DONE":
             evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
-            if evaluated < max_hypotheses and not is_last:
-                pending_ids = [h["id"] for h in hypotheses if h["status"] == "pending"]
-                logger.warning("Agent called DONE at step %d with only %d/%d hypotheses evaluated", step_num, evaluated, max_hypotheses)
-                report_steps.append({"step": step_num, "thought": thought, "action": "DONE", "params": {},
-                                     "blocked": f"DONE blocked — only {evaluated}/{max_hypotheses} hypotheses evaluated, pending: {pending_ids}"})
-                messages.append({"role": "assistant", "content": raw})
-                if pending_ids:
-                    detail = f"Evaluate the pending hypotheses first: {pending_ids}."
+            floor_seeds = [h for h in hypotheses if h.get("seeded_by") == "auto_gsea"]
+            floor_done = all(h["status"] != "pending" for h in floor_seeds)
+            novelty_exhausted = len(novelty_window) >= 3 and not any(novelty_window)
+            # DONE allowed when: safety last-step, OR floor done AND (budget met OR novelty exhausted)
+            can_done = is_last or (floor_done and (evaluated >= max_hypotheses or novelty_exhausted))
+            if not can_done:
+                pending_floor = [h["id"] for h in floor_seeds if h["status"] == "pending"]
+                logger.warning("DONE blocked at step %d: floor_done=%s novelty_exhausted=%s eval=%d/%d",
+                               step_num, floor_done, novelty_exhausted, evaluated, max_hypotheses)
+                if not floor_done:
+                    detail = (
+                        f"Floor comparison seeds still pending: {pending_floor}. "
+                        f"Call meta_gsea for each and evaluate before calling DONE."
+                    )
                 else:
                     remaining = max_hypotheses - evaluated
-                    detail = f"You need to propose and evaluate {remaining} more hypothesis{'es' if remaining > 1 else ''} — none are currently pending, so propose a new one."
-                messages.append({"role": "user", "content": (
-                    f"ERROR: Cannot call DONE yet — only {evaluated}/{max_hypotheses} hypotheses evaluated. {detail}"
-                )})
+                    pending_all = [h["id"] for h in hypotheses if h["status"] == "pending"]
+                    if pending_all:
+                        detail = (
+                            f"Pending hypotheses: {pending_all}. Evaluate these, or propose {remaining} "
+                            f"more novel hypotheses. DONE also unlocks when the last 3 proposals are all "
+                            f"redundant with existing findings (novelty window: {list(novelty_window)})."
+                        )
+                    else:
+                        detail = (
+                            f"Need {remaining} more evaluated hypotheses, or propose hypotheses until "
+                            f"3 in a row are redundant with existing findings "
+                            f"(novelty window: {list(novelty_window)})."
+                        )
+                report_steps.append({"step": step_num, "thought": thought, "action": "DONE", "params": {},
+                                     "blocked": f"DONE blocked: {detail}"})
+                messages.append({"role": "assistant", "content": raw})
+                messages.append({"role": "user", "content": f"ERROR: Cannot call DONE yet. {detail}"})
                 continue
             yield {"type": "done", "text": thought}
             report_path = await loop.run_in_executor(
@@ -482,19 +627,79 @@ async def run_agent_loop(
             yield {"type": "error", "text": f"Unknown tool: {action}"}
 
         # Process evaluate AFTER tool call
+        _eval_correction = None
         if isinstance(hypo_action, dict) and hypo_action.get("type") == "evaluate" and hypo_action.get("hypothesis_id"):
-            h = next((x for x in hypotheses if x["id"] == hypo_action["hypothesis_id"]), None)
-            if h:
+            hid = hypo_action["hypothesis_id"]
+            h = next((x for x in hypotheses if x["id"] == hid), None)
+
+            if h is None:
+                if hypo_action.get("text"):
+                    # Auto-register as new pending hypothesis; do NOT apply the verdict yet
+                    hypo_counter += 1
+                    new_id = f"H{hypo_counter}"
+                    new_genes = hypo_action.get("genes", [])
+                    h_new = {
+                        "id": new_id, "text": hypo_action["text"], "genes": new_genes,
+                        "status": "pending", "evidence": [], "proposed_at": step_num, "seeded_by": "llm",
+                    }
+                    hypotheses.append(h_new)
+                    yield {"type": "hypothesis_propose", "hypothesis": dict(h_new)}
+                    resolved_so_far = [x for x in hypotheses[:-1] if x["status"] != "pending"]
+                    novelty_window.append(_is_novel(new_genes, resolved_so_far))
+                    logger.info("Auto-registered unknown id %s as %s at step %d", hid, new_id, step_num)
+                    _eval_correction = (
+                        f"NOTICE: hypothesis_id '{hid}' was not found. Your text was registered as "
+                        f"new hypothesis {new_id} (PENDING). Gather evidence and evaluate {new_id} "
+                        f"in a future step — it has NOT been marked with your requested verdict."
+                    )
+                    h = None  # don't process the verdict on the newly registered hypothesis
+                else:
+                    valid_ids = [x["id"] for x in hypotheses]
+                    yield {"type": "error", "text": f"evaluate: unknown hypothesis_id '{hid}'; valid: {valid_ids}"}
+                    logger.warning("Unknown hypothesis id '%s' at step %d, no text to register", hid, step_num)
+                    _eval_correction = (
+                        f"ERROR: hypothesis_id '{hid}' not found. Valid IDs: {valid_ids}. "
+                        f"Propose it first with a 'propose' action (and get its assigned id), "
+                        f"then evaluate that id in a subsequent step."
+                    )
+
+            if h is not None:
+                # Attach structured evidence
+                n_datasets, best_fdr = _extract_evidence_meta(action, result or {})
+                ev_item = {
+                    "step": step_num,
+                    "action": action,
+                    "method_family": _METHOD_FAMILY.get(action, "other"),
+                    "n_datasets": n_datasets,
+                    "best_fdr": best_fdr,
+                    "reasoning": hypo_action.get("reasoning", ""),
+                    "key_stats": extract_evidence_stats(action, result or {}, h.get("genes", [])),
+                }
+                h["evidence"].append(ev_item)
+
+                # Gate the verdict
                 verdict = hypo_action.get("verdict", "uncertain")
                 if verdict not in ("confirmed", "rejected", "uncertain"):
                     verdict = "uncertain"
+                if verdict == "confirmed":
+                    ok, issues = _check_confirmed_gate(h)
+                    if not ok:
+                        verdict = "uncertain"
+                        _eval_correction = (
+                            f"WARNING: {hid} verdict downgraded confirmed → uncertain. "
+                            f"Gate not met: {'; '.join(issues)}. "
+                            f"Add evidence from a second orthogonal method before re-evaluating."
+                        )
+                elif verdict == "rejected":
+                    ok, issues = _check_rejected_gate(h)
+                    if not ok:
+                        verdict = "uncertain"
+                        _eval_correction = (
+                            f"WARNING: {hid} verdict downgraded rejected → uncertain. "
+                            f"{'; '.join(issues)}."
+                        )
+
                 h["status"] = verdict
-                h["evidence"].append({
-                    "step": step_num,
-                    "action": action,
-                    "reasoning": hypo_action.get("reasoning", ""),
-                    "key_stats": extract_evidence_stats(action, result or {}, h.get("genes", [])),
-                })
                 yield {
                     "type": "hypothesis_eval",
                     "hypothesis": dict(h),
@@ -524,7 +729,10 @@ async def run_agent_loop(
 
         messages.append({"role": "assistant", "content": raw})
         result_str = json.dumps(result, default=str)[:2500] if result is not None else "null"
-        messages.append({"role": "user", "content": f"Result of {action}:\n{result_str}"})
+        user_result_msg = f"Result of {action}:\n{result_str}"
+        if _eval_correction:
+            user_result_msg += f"\n\n{_eval_correction}"
+        messages.append({"role": "user", "content": user_result_msg})
 
     # Loop exhausted without DONE — write report with what we have
     evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
