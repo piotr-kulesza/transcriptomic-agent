@@ -253,7 +253,7 @@ def contextual_modules(datasets, datasetName=None, contextGene=None, topN=20, **
 
 def pathway_enrichment(datasets: dict, genes: list = None, deg_datasets: dict = None,
                        deg_dataset_name: str = None, adj_p_threshold: float = 0.05,
-                       logfc_threshold: float = 0.5, **_) -> dict:
+                       logfc_threshold: float = 0.5, collection_prefix: str = None, **_) -> dict:
     """
     Hypergeometric test + BH correction against gene sets from local GMT file.
     GMT file path must be set via GMT_FILE environment variable.
@@ -291,6 +291,12 @@ def pathway_enrichment(datasets: dict, genes: list = None, deg_datasets: dict = 
         all_gene_sets = _load_gene_sets()
     except RuntimeError as e:
         return {"error": str(e)}
+
+    if collection_prefix:
+        pfx = collection_prefix.upper()
+        all_gene_sets = {k: v for k, v in all_gene_sets.items() if k.upper().startswith(pfx)}
+        if not all_gene_sets:
+            return {"error": f"No gene sets found with prefix '{collection_prefix}' in GMT file"}
 
     N = 25000  # background: human transcriptome
     gene_set_input = {g.upper() for g in (genes or [])}

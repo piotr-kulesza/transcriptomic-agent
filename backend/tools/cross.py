@@ -238,7 +238,8 @@ def meta_gsea(datasets: list, deg_datasets: dict = None,
               groupA: str = None, groupB: str = None,
               mappings: dict = None,
               min_size: int = 15, max_size: int = 500,
-              permutation_num: int = 200, topN: int = 10, **_) -> dict:
+              permutation_num: int = 200, topN: int = 10,
+              collection_prefix: str = None, **_) -> dict:
     """
     Meta-analysis GSEA: pool all datasets/DEG tables for a comparison via signed Stouffer Z,
     then run gseapy.prerank against the GMT gene sets. Prefer this over per-file gsea_enrichment
@@ -275,6 +276,12 @@ def meta_gsea(datasets: list, deg_datasets: dict = None,
         gene_sets = _load_gene_sets()
     except RuntimeError as e:
         return {"error": str(e)}
+
+    if collection_prefix:
+        pfx = collection_prefix.upper()
+        gene_sets = {k: v for k, v in gene_sets.items() if k.upper().startswith(pfx)}
+        if not gene_sets:
+            return {"error": f"No gene sets found with prefix '{collection_prefix}' in GMT file"}
 
     try:
         import gseapy
