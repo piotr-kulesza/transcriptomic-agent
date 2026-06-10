@@ -12,7 +12,7 @@ import pandas as pd
 from scipy.stats import mannwhitneyu as mwu
 from statsmodels.stats.multitest import multipletests
 
-from ..tools.cross import cross_dataset_de, resolve_group
+from ..tools.cross import cross_dataset_de, resolve_group, meta_rank
 from ..tools.single import _gsea_compute_es, _load_gene_sets
 
 
@@ -270,7 +270,11 @@ def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = N
         except Exception as e:
             summary_lines.append(f"  {ds_name}: seeder error — {e}")
 
-    # ── 2. DEG table summary — data-driven ranked-enrichment seeds ──────
+    # ── 2. DEG table summary + one meta-GSEA seed per unique comparison ──
+    #
+    # Collect summary stats per file for the report, then iterate UNIQUE canonical
+    # comparison pairs (not per-file) so 14 DEG files → ~6 seeds, not 14.
+    _mappings_here = mappings or {}
     for ds_name, ds in _deg.items():
         try:
             for comp in ds["comparisons"]:
@@ -292,35 +296,59 @@ def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = N
                     "top_up": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_up],
                     "top_down": [{"gene": g, "logFC": float(df.loc[g, "logFC"]), "adj_p": float(df.loc[g, "adj_p"])} for g in top_down],
                 })
-
-                gA, gB = comp["groupA"], comp["groupB"]
-
-                # Run ranked enrichment and seed the top hit — identical treatment for every comparison
-                gsea_hit = _top_gsea_hit(comp["df"])
-                if gsea_hit:
-                    seeds.append({
-                        "id": f"S{seed_id}",
-                        "text": (
-                            f"{gA} vs {gB} ({ds_name}): "
-                            f"top ranked-enrichment signal is {gsea_hit['pathway']} "
-                            f"({gsea_hit['direction']}, NES={gsea_hit['nes']}, adj_p={gsea_hit['adj_p']}). "
-                            f"Use gsea_enrichment(deg_dataset_name='{ds_name}', "
-                            f"groupA='{gA}', groupB='{gB}') to characterise the full pathway landscape."
-                        ),
-                        "status": "pending",
-                        "evidence": [],
-                        "proposed_at": 0,
-                        "seeded_by": "auto_gsea",
-                        "genes": gsea_hit["leading_edge"],
-                    })
-                    seed_id += 1
-                    summary_lines.append(
-                        f"  → GSEA seed (S{seed_id - 1}): "
-                        f"{gsea_hit['direction']} {gsea_hit['pathway']} NES={gsea_hit['nes']}"
-                    )
-
         except Exception as e:
             summary_lines.append(f"  {ds_name}: DEG summary error — {e}")
+
+    # One meta-GSEA seed per unique canonical comparison pair
+    seen_pairs: dict = {}  # canonical_key → (gA, gB) first-occurrence orientation
+    for ds in _deg.values():
+        for comp in ds["comparisons"]:
+            gA = resolve_group(comp["groupA"], _mappings_here)
+            gB = resolve_group(comp["groupB"], _mappings_here)
+            key = tuple(sorted([gA, gB]))
+            if key not in seen_pairs:
+                seen_pairs[key] = (gA, gB)
+
+    for key, (gA, gB) in seen_pairs.items():
+        try:
+            rnk = meta_rank(datasets, _deg, gA, gB, mappings=_mappings_here)
+            if rnk.empty:
+                continue
+            # Use _top_gsea_hit via a synthetic DataFrame (Z as logFC for ranking)
+            df_rnk = rnk.rename("logFC").to_frame()
+            gsea_hit = _top_gsea_hit(df_rnk)
+            if not gsea_hit:
+                continue
+
+            n_sources = sum(
+                1 for ds in _deg.values()
+                for comp in ds["comparisons"]
+                if {resolve_group(comp["groupA"], _mappings_here),
+                    resolve_group(comp["groupB"], _mappings_here)} == {gA, gB}
+            )
+            seeds.append({
+                "id": f"S{seed_id}",
+                "text": (
+                    f"{gA} vs {gB} meta-GSEA ({n_sources} source(s)): "
+                    f"top signal is {gsea_hit['pathway']} "
+                    f"({gsea_hit['direction']}, NES={gsea_hit['nes']}, adj_p={gsea_hit['adj_p']}). "
+                    f"Verify and characterise both axes with "
+                    f"meta_gsea(groupA='{gA}', groupB='{gB}')."
+                ),
+                "status": "pending",
+                "evidence": [],
+                "proposed_at": 0,
+                "seeded_by": "auto_gsea",
+                "genes": gsea_hit["leading_edge"],
+                "_comparison": (gA, gB),
+            })
+            seed_id += 1
+            summary_lines.append(
+                f"  → meta-GSEA seed S{seed_id - 1} ({gA} vs {gB}, {n_sources} src): "
+                f"{gsea_hit['direction']} {gsea_hit['pathway']} NES={gsea_hit['nes']}"
+            )
+        except Exception as e:
+            summary_lines.append(f"  meta-GSEA {gA} vs {gB}: error — {e}")
 
     # ── 3. Cross-dataset DE (raw datasets + DEG tables combined) ─────────
     try:
