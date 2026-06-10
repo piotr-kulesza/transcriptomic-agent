@@ -1,0 +1,239 @@
+
+======================================================================
+DIEvsEH
+======================================================================
+
+[fgsea Hallmarks] 10 sig (padj<0.05) of 10
+  UP   NES=+2.23 padj=3.1e-08  HALLMARK_MYOGENESIS
+  UP   NES=+2.08 padj=5.0e-06  HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION
+  UP   NES=+2.02 padj=3.4e-05  HALLMARK_TNFA_SIGNALING_VIA_NFKB
+  UP   NES=+1.82 padj=4.2e-03  HALLMARK_UV_RESPONSE_DN
+  UP   NES=+1.58 padj=3.9e-02  HALLMARK_KRAS_SIGNALING_UP
+  DOWN NES=-1.65 padj=7.3e-03  HALLMARK_G2M_CHECKPOINT
+  DOWN NES=-1.65 padj=7.3e-03  HALLMARK_GLYCOLYSIS
+  DOWN NES=-1.74 padj=2.9e-03  HALLMARK_OXIDATIVE_PHOSPHORYLATION
+  DOWN NES=-1.76 padj=2.5e-03  HALLMARK_MYC_TARGETS_V1
+  DOWN NES=-2.17 padj=5.1e-07  HALLMARK_E2F_TARGETS
+
+[KEGG ORA] top 8
+  padj=9.6e-05 fold=3.1  Cytoskeleton in muscle cells
+  padj=2.0e-03 fold=4.1  Complement and coagulation cascades
+  padj=2.0e-03 fold=3.1  Cell adhesion molecule (CAM) interaction
+  padj=1.6e-02 fold=3.3  Staphylococcus aureus infection
+  padj=1.6e-02 fold=3.3  Hematopoietic cell lineage
+  padj=1.8e-02 fold=2.9  Vascular smooth muscle contraction
+  padj=1.8e-02 fold=2.4  Focal adhesion
+  padj=1.9e-02 fold=3.5  Leishmaniasis
+
+[GO_BP ORA] top 8
+  padj=1.7e-03 fold=2.3  actin filament organization
+  padj=2.2e-03 fold=2.3  wound healing
+  padj=2.2e-03 fold=2.4  regulation of actin filament-based process
+  padj=2.2e-03 fold=3.2  actin filament bundle assembly
+  padj=2.2e-03 fold=2.3  regulation of supramolecular fiber organization
+  padj=2.3e-03 fold=3.2  actin filament bundle organization
+  padj=2.5e-03 fold=2.9  actomyosin structure organization
+  padj=9.2e-03 fold=2.1  muscle system process
+
+======================================================================
+DIEvsOE
+======================================================================
+
+[fgsea Hallmarks] 9 sig (padj<0.05) of 9
+  UP   NES=+2.02 padj=8.2e-07  HALLMARK_G2M_CHECKPOINT
+  UP   NES=+1.83 padj=1.2e-04  HALLMARK_OXIDATIVE_PHOSPHORYLATION
+  UP   NES=+1.81 padj=2.2e-04  HALLMARK_E2F_TARGETS
+  UP   NES=+1.66 padj=2.7e-03  HALLMARK_MYC_TARGETS_V1
+  UP   NES=+1.54 padj=2.5e-02  HALLMARK_ESTROGEN_RESPONSE_LATE
+  DOWN NES=-1.51 padj=3.9e-02  HALLMARK_COMPLEMENT
+  DOWN NES=-1.61 padj=3.9e-02  HALLMARK_APOPTOSIS
+  DOWN NES=-1.74 padj=3.9e-02  HALLMARK_IL6_JAK_STAT3_SIGNALING
+  DOWN NES=-1.76 padj=3.0e-02  HALLMARK_INTERFERON_ALPHA_RESPONSE
+
+[KEGG ORA] top 5
+  padj=3.3e-03 fold=3.7  Complement and coagulation cascades
+  padj=3.3e-03 fold=4.5  Ovarian steroidogenesis
+  padj=1.2e-02 fold=4.1  Cholesterol metabolism
+  padj=4.3e-02 fold=2.5  Phospholipase D signaling pathway
+  padj=4.3e-02 fold=3.7  Endocrine and other factor-regulated calcium reabsorption
+
+[GO_BP ORA] top 8
+  padj=4.6e-08 fold=3.1  epithelial tube morphogenesis
+  padj=2.4e-07 fold=2.6  regulation of nervous system development
+  padj=2.4e-07 fold=3.0  reproductive structure development
+  padj=2.4e-07 fold=3.0  reproductive system development
+  padj=2.4e-07 fold=2.6  gland development
+  padj=2.7e-07 fold=3.7  morphogenesis of a branching epithelium
+  padj=1.1e-06 fold=3.8  branching morphogenesis of an epithelial tube
+  padj=1.2e-06 fold=2.5  wound healing
+
+======================================================================
+DIEvsPE
+======================================================================
+
+[fgsea Hallmarks] 16 sig (padj<0.05) of 16
+  UP   NES=+2.22 padj=3.6e-11  HALLMARK_MYC_TARGETS_V1
+  UP   NES=+2.13 padj=1.8e-09  HALLMARK_OXIDATIVE_PHOSPHORYLATION
+  UP   NES=+1.80 padj=8.8e-05  HALLMARK_G2M_CHECKPOINT
+  UP   NES=+1.72 padj=5.0e-04  HALLMARK_ADIPOGENESIS
+  UP   NES=+1.70 padj=2.0e-03  HALLMARK_FATTY_ACID_METABOLISM
+  UP   NES=+1.59 padj=2.6e-02  HALLMARK_PROTEIN_SECRETION
+  UP   NES=+1.53 padj=2.5e-02  HALLMARK_UV_RESPONSE_DN
+  UP   NES=+1.47 padj=2.1e-02  HALLMARK_E2F_TARGETS
+  UP   NES=+1.43 padj=3.2e-02  HALLMARK_MTORC1_SIGNALING
+  DOWN NES=-1.44 padj=2.5e-02  HALLMARK_INTERFERON_GAMMA_RESPONSE
+  DOWN NES=-1.49 padj=1.3e-02  HALLMARK_KRAS_SIGNALING_UP
+  DOWN NES=-1.54 padj=3.0e-02  HALLMARK_IL6_JAK_STAT3_SIGNALING
+  DOWN NES=-1.54 padj=7.0e-03  HALLMARK_KRAS_SIGNALING_DN
+  DOWN NES=-1.64 padj=7.3e-03  HALLMARK_INTERFERON_ALPHA_RESPONSE
+  DOWN NES=-1.69 padj=5.0e-04  HALLMARK_INFLAMMATORY_RESPONSE
+  DOWN NES=-2.22 padj=3.6e-11  HALLMARK_ALLOGRAFT_REJECTION
+
+[KEGG ORA] top 8
+  padj=4.1e-04 fold=6.9  Staphylococcus aureus infection
+  padj=2.6e-03 fold=4.7  Cell adhesion molecule (CAM) interaction
+  padj=2.9e-03 fold=6.2  Complement and coagulation cascades
+  padj=2.9e-03 fold=5.3  Leukocyte transendothelial migration
+  padj=3.4e-03 fold=5.7  Rheumatoid arthritis
+  padj=1.8e-02 fold=3.9  Phagosome
+  padj=1.8e-02 fold=5.8  Viral myocarditis
+  padj=1.9e-02 fold=4.8  Hematopoietic cell lineage
+
+[GO_BP ORA] top 8
+  padj=1.8e-03 fold=24.1  T cell activation via T cell receptor contact with antigen bound to MHC molecule on antigen presenting cell
+  padj=1.8e-03 fold=3.8  leukocyte activation involved in immune response
+  padj=1.8e-03 fold=3.8  cell activation involved in immune response
+  padj=5.2e-03 fold=3.3  positive regulation of cell activation
+  padj=7.5e-03 fold=3.3  positive regulation of leukocyte activation
+  padj=1.3e-02 fold=3.8  myeloid leukocyte activation
+  padj=2.4e-02 fold=2.8  cellular component disassembly
+  padj=2.8e-02 fold=8.4  neutrophil activation
+
+======================================================================
+OEvsEH
+======================================================================
+
+[fgsea Hallmarks] 21 sig (padj<0.05) of 21
+  UP   NES=+1.94 padj=1.8e-06  HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION
+  UP   NES=+1.87 padj=8.0e-06  HALLMARK_COMPLEMENT
+  UP   NES=+1.82 padj=3.8e-05  HALLMARK_INTERFERON_GAMMA_RESPONSE
+  UP   NES=+1.79 padj=5.2e-04  HALLMARK_COAGULATION
+  UP   NES=+1.69 padj=5.0e-03  HALLMARK_INTERFERON_ALPHA_RESPONSE
+  UP   NES=+1.67 padj=6.3e-04  HALLMARK_MYOGENESIS
+  UP   NES=+1.61 padj=1.3e-02  HALLMARK_IL6_JAK_STAT3_SIGNALING
+  UP   NES=+1.61 padj=1.8e-03  HALLMARK_KRAS_SIGNALING_UP
+  UP   NES=+1.58 padj=2.5e-03  HALLMARK_P53_PATHWAY
+  UP   NES=+1.55 padj=5.9e-03  HALLMARK_APOPTOSIS
+  UP   NES=+1.46 padj=1.3e-02  HALLMARK_INFLAMMATORY_RESPONSE
+  UP   NES=+1.45 padj=1.4e-02  HALLMARK_TNFA_SIGNALING_VIA_NFKB
+  UP   NES=+1.44 padj=3.3e-02  HALLMARK_UV_RESPONSE_DN
+  UP   NES=+1.41 padj=2.5e-02  HALLMARK_HYPOXIA
+  UP   NES=+1.40 padj=2.5e-02  HALLMARK_ALLOGRAFT_REJECTION
+  DOWN NES=-1.70 padj=1.8e-04  HALLMARK_ESTROGEN_RESPONSE_LATE
+  DOWN NES=-1.85 padj=2.3e-03  HALLMARK_MYC_TARGETS_V2
+  DOWN NES=-1.98 padj=5.8e-08  HALLMARK_OXIDATIVE_PHOSPHORYLATION
+  DOWN NES=-2.07 padj=2.9e-09  HALLMARK_MYC_TARGETS_V1
+  DOWN NES=-2.51 padj=1.2e-20  HALLMARK_G2M_CHECKPOINT
+  DOWN NES=-2.52 padj=1.2e-20  HALLMARK_E2F_TARGETS
+
+[KEGG ORA] top 8
+  padj=7.2e-10 fold=2.5  Integrin signaling
+  padj=8.0e-08 fold=2.3  Cell adhesion molecule (CAM) interaction
+  padj=8.6e-08 fold=2.7  Complement and coagulation cascades
+  padj=9.6e-08 fold=2.7  ECM-receptor interaction
+  padj=1.4e-05 fold=2.0  Phagosome
+  padj=1.6e-05 fold=1.8  Cytoskeleton in muscle cells
+  padj=5.1e-05 fold=2.0  Cell cycle
+  padj=5.6e-05 fold=2.2  Staphylococcus aureus infection
+
+[GO_BP ORA] top 8
+  padj=3.8e-13 fold=2.0  gland development
+  padj=8.7e-12 fold=2.1  extracellular matrix organization
+  padj=8.7e-12 fold=2.1  extracellular structure organization
+  padj=8.7e-12 fold=2.1  external encapsulating structure organization
+  padj=2.0e-10 fold=2.1  kidney development
+  padj=2.5e-10 fold=2.0  renal system development
+  padj=4.2e-10 fold=2.4  morphogenesis of a branching epithelium
+  padj=4.2e-10 fold=2.3  morphogenesis of a branching structure
+
+======================================================================
+OEvsPE
+======================================================================
+
+[fgsea Hallmarks] 6 sig (padj<0.05) of 6
+  UP   NES=+1.60 padj=4.8e-02  HALLMARK_UV_RESPONSE_DN
+  DOWN NES=-1.49 padj=4.8e-02  HALLMARK_E2F_TARGETS
+  DOWN NES=-1.52 padj=4.8e-02  HALLMARK_ESTROGEN_RESPONSE_LATE
+  DOWN NES=-1.59 padj=4.8e-02  HALLMARK_ALLOGRAFT_REJECTION
+  DOWN NES=-1.72 padj=4.8e-02  HALLMARK_ANGIOGENESIS
+  DOWN NES=-1.73 padj=4.8e-02  HALLMARK_WNT_BETA_CATENIN_SIGNALING
+
+[KEGG ORA] top 8
+  padj=5.6e-04 fold=3.1  Phospholipase D signaling pathway
+  padj=5.6e-04 fold=2.8  Wnt signaling pathway
+  padj=2.7e-03 fold=4.4  Ovarian steroidogenesis
+  padj=2.9e-02 fold=2.2  Rap1 signaling pathway
+  padj=2.9e-02 fold=2.7  TGF-beta signaling pathway
+  padj=2.9e-02 fold=2.2  Proteoglycans in cancer
+  padj=2.9e-02 fold=2.8  Fc gamma R-mediated phagocytosis
+  padj=2.9e-02 fold=3.6  Endocrine and other factor-regulated calcium reabsorption
+
+[GO_BP ORA] top 8
+  padj=1.2e-09 fold=2.9  gland development
+  padj=1.2e-09 fold=2.9  embryonic organ development
+  padj=1.5e-09 fold=3.2  epithelial tube morphogenesis
+  padj=1.5e-09 fold=3.4  embryonic organ morphogenesis
+  padj=2.3e-09 fold=8.0  endocardial cushion development
+  padj=6.8e-09 fold=2.7  pattern specification process
+  padj=1.3e-08 fold=3.7  anterior/posterior pattern specification
+  padj=3.4e-08 fold=2.8  regionalization
+
+======================================================================
+PEvsEH
+======================================================================
+
+[fgsea Hallmarks] 24 sig (padj<0.05) of 24
+  UP   NES=+2.20 padj=6.0e-11  HALLMARK_ALLOGRAFT_REJECTION
+  UP   NES=+1.97 padj=5.9e-07  HALLMARK_INFLAMMATORY_RESPONSE
+  UP   NES=+1.92 padj=3.4e-06  HALLMARK_MYOGENESIS
+  UP   NES=+1.91 padj=7.7e-06  HALLMARK_KRAS_SIGNALING_UP
+  UP   NES=+1.87 padj=1.6e-03  HALLMARK_ANGIOGENESIS
+  UP   NES=+1.76 padj=1.4e-04  HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION
+  UP   NES=+1.73 padj=1.4e-04  HALLMARK_INTERFERON_GAMMA_RESPONSE
+  UP   NES=+1.70 padj=1.5e-02  HALLMARK_WNT_BETA_CATENIN_SIGNALING
+  UP   NES=+1.56 padj=1.5e-02  HALLMARK_COAGULATION
+  UP   NES=+1.55 padj=4.5e-03  HALLMARK_APICAL_JUNCTION
+  UP   NES=+1.54 padj=3.6e-02  HALLMARK_IL6_JAK_STAT3_SIGNALING
+  UP   NES=+1.50 padj=1.4e-02  HALLMARK_COMPLEMENT
+  UP   NES=+1.50 padj=1.4e-02  HALLMARK_P53_PATHWAY
+  UP   NES=+1.38 padj=4.5e-02  HALLMARK_KRAS_SIGNALING_DN
+  DOWN NES=-1.38 padj=4.5e-02  HALLMARK_GLYCOLYSIS
+  DOWN NES=-1.55 padj=3.6e-03  HALLMARK_MTORC1_SIGNALING
+  DOWN NES=-1.56 padj=1.4e-02  HALLMARK_FATTY_ACID_METABOLISM
+  DOWN NES=-1.57 padj=2.0e-02  HALLMARK_UNFOLDED_PROTEIN_RESPONSE
+  DOWN NES=-1.60 padj=3.3e-02  HALLMARK_MYC_TARGETS_V2
+  DOWN NES=-1.73 padj=4.5e-03  HALLMARK_PROTEIN_SECRETION
+  DOWN NES=-2.09 padj=2.3e-08  HALLMARK_G2M_CHECKPOINT
+  DOWN NES=-2.22 padj=4.1e-10  HALLMARK_E2F_TARGETS
+  DOWN NES=-2.45 padj=1.6e-15  HALLMARK_OXIDATIVE_PHOSPHORYLATION
+  DOWN NES=-2.57 padj=2.2e-18  HALLMARK_MYC_TARGETS_V1
+
+[KEGG ORA] top 8
+  padj=3.4e-10 fold=5.9  Staphylococcus aureus infection
+  padj=1.2e-08 fold=5.3  Hematopoietic cell lineage
+  padj=3.6e-08 fold=4.1  Cell adhesion molecule (CAM) interaction
+  padj=6.5e-08 fold=4.1  Phagosome
+  padj=8.2e-08 fold=5.1  Rheumatoid arthritis
+  padj=9.7e-08 fold=5.6  Leishmaniasis
+  padj=1.0e-07 fold=9.1  Asthma
+  padj=1.0e-07 fold=8.1  Allograft rejection
+
+[GO_BP ORA] top 8
+  padj=7.0e-12 fold=12.7  antigen processing and presentation of peptide antigen via MHC class II
+  padj=1.1e-11 fold=12.1  antigen processing and presentation of peptide or polysaccharide antigen via MHC class II
+  padj=6.3e-11 fold=10.9  antigen processing and presentation of exogenous peptide antigen
+  padj=8.9e-11 fold=12.7  antigen processing and presentation of exogenous peptide antigen via MHC class II
+  padj=1.2e-10 fold=9.4  antigen processing and presentation of exogenous antigen
+  padj=7.8e-09 fold=7.0  antigen processing and presentation of peptide antigen
+  padj=7.8e-09 fold=5.4  antigen processing and presentation
+  padj=2.0e-08 fold=16.4  peptide antigen assembly with MHC class II protein complex

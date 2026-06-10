@@ -1,7 +1,7 @@
 from .single import (
     dataset_summary, top_variable_genes, differential_expression,
     gene_expression_by_group, nonlinear_rule, contextual_modules,
-    pathway_enrichment, batch_detection, subgroup_discovery, gene_network_hub,
+    pathway_enrichment, gsea_enrichment, batch_detection, subgroup_discovery, gene_network_hub,
 )
 from .cross import (
     cross_dataset_de, cross_dataset_correlation, invariant_axis, cross_dataset_rewiring,
@@ -19,6 +19,7 @@ TOOLS = {
     "nonlinear_rule":            nonlinear_rule,
     "contextual_modules":        contextual_modules,
     "pathway_enrichment":        pathway_enrichment,
+    "gsea_enrichment":           gsea_enrichment,
     "batch_detection":           batch_detection,
     "subgroup_discovery":        subgroup_discovery,
     "gene_network_hub":          gene_network_hub,
@@ -38,6 +39,7 @@ CROSS_TOOL_NAMES = {
 }
 
 DEG_TOOL_NAMES = {
+    "gsea_enrichment",
     "deg_voting", "deg_cooccurrence_network", "deg_biomarker_ranking", "deg_direction_comparison",
     "network_meta_analysis",
 }
@@ -62,6 +64,7 @@ def summarize_result(action: str, r: dict) -> str:
             "cross_dataset_correlation": lambda: f"replication min={r['min_replication']} | {r['interpretation']}",
             "invariant_axis":            lambda: f"invariant in {r['axis_consistent_in']} | {r['interpretation']}",
             "cross_dataset_rewiring":    lambda: f"{r['gene_pair']}: Δr={r['rewiring_magnitude']} | {r['interpretation']}",
+            "gsea_enrichment":           lambda: r["interpretation"],
             "deg_voting":                lambda: r["interpretation"],
             "deg_cooccurrence_network":  lambda: r["interpretation"],
             "deg_biomarker_ranking":     lambda: r["interpretation"],

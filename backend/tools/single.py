@@ -351,6 +351,186 @@ def pathway_enrichment(datasets: dict, genes: list = None, deg_datasets: dict = 
     }
 
 
+def _gsea_compute_es(rank_scores: np.ndarray, set_idx: np.ndarray) -> float:
+    """Compute GSEA enrichment score given sorted rank scores and gene-set position indices."""
+    N = len(rank_scores)
+    n_set = len(set_idx)
+    if n_set == 0 or n_set >= N:
+        return 0.0
+    mask = np.zeros(N, dtype=bool)
+    mask[set_idx] = True
+    abs_r = np.abs(rank_scores)
+    nr = abs_r[mask].sum()
+    if nr == 0:
+        nr = float(n_set)
+    rs = np.cumsum(np.where(mask, abs_r / nr, -1.0 / (N - n_set)))
+    mx, mn = rs.max(), rs.min()
+    return float(mx) if abs(mx) >= abs(mn) else float(mn)
+
+
+def gsea_enrichment(datasets: list, deg_datasets: dict = None,
+                    deg_dataset_name: str = None,
+                    groupA: str = None, groupB: str = None,
+                    rank_by: str = "signed_logfc",
+                    min_size: int = 15, max_size: int = 500,
+                    n_perm: int = 200, topN: int = 10, **_) -> dict:
+    """
+    Pre-ranked GSEA: ranks all genes in a DEG comparison by signed logFC (or signed −log10 adj_p)
+    and runs KS-statistic enrichment against the GMT gene sets (same file as pathway_enrichment).
+    Returns signed NES + adj_p for both UP-enriched and DOWN-enriched gene sets.
+    Unlike pathway_enrichment (ORA), this detects distributed moderate-effect shifts without a cutoff.
+    """
+    if not deg_datasets:
+        return {"error": "No DEG datasets available — gsea_enrichment requires a DEG table"}
+    if not deg_dataset_name:
+        return {"error": "deg_dataset_name is required — specify which DEG dataset to rank genes from"}
+    if deg_dataset_name not in deg_datasets:
+        return {"error": f"DEG dataset '{deg_dataset_name}' not found. Available: {list(deg_datasets.keys())}"}
+
+    ds = deg_datasets[deg_dataset_name]
+    flip = False
+    comp = None
+    if groupA and groupB:
+        for c in ds["comparisons"]:
+            if c["groupA"] == groupA and c["groupB"] == groupB:
+                comp, flip = c, False
+                break
+            if c["groupA"] == groupB and c["groupB"] == groupA:
+                comp, flip = c, True
+                break
+        if comp is None:
+            avail = [(c["groupA"], c["groupB"]) for c in ds["comparisons"]]
+            return {"error": f"No comparison {groupA!r} vs {groupB!r} in '{deg_dataset_name}'. Available: {avail}"}
+    else:
+        if not ds["comparisons"]:
+            return {"error": f"'{deg_dataset_name}' has no comparisons"}
+        comp = ds["comparisons"][0]
+
+    df = comp["df"].copy()
+    if flip:
+        df["logFC"] = -df["logFC"]
+    df = df.dropna(subset=["logFC"])
+    if "adj_p" not in df.columns:
+        df["adj_p"] = 1.0
+    df["adj_p"] = df["adj_p"].clip(lower=1e-300).fillna(1.0)
+
+    if rank_by == "signed_neg_log_p":
+        df["_score"] = np.sign(df["logFC"]) * (-np.log10(df["adj_p"]))
+    else:
+        df["_score"] = df["logFC"].values
+
+    df_sorted = df.sort_values("_score", ascending=False)
+    genes_upper = [g.upper() for g in df_sorted.index.tolist()]
+    rank_scores = df_sorted["_score"].values.astype(float)
+    gene_to_pos = {g: i for i, g in enumerate(genes_upper)}
+    N = len(genes_upper)
+
+    if N < 10:
+        return {"error": f"Too few genes ({N}) for GSEA in '{deg_dataset_name}'"}
+
+    try:
+        all_gene_sets = _load_gene_sets()
+    except RuntimeError as e:
+        return {"error": str(e)}
+
+    # Build filtered gene sets (overlap indices in ranked list)
+    filtered: dict = {}
+    for gs_name, members in all_gene_sets.items():
+        idx = np.array([gene_to_pos[g.upper()] for g in members if g.upper() in gene_to_pos])
+        if min_size <= len(idx) <= max_size:
+            filtered[gs_name] = idx
+
+    if not filtered:
+        return {"error": f"No gene sets with {min_size}–{max_size} members found in ranked list"}
+
+    # Observed ES per gene set; group by size for permutation sharing
+    obs_es: dict = {}
+    size_groups: dict = {}
+    for gs_name, idx in filtered.items():
+        obs_es[gs_name] = _gsea_compute_es(rank_scores, idx)
+        size_groups.setdefault(len(idx), []).append(gs_name)
+
+    # Null ES distributions per size class (fgsea-style permutation sharing)
+    rng = np.random.default_rng(42)
+    null_per_size: dict = {}
+    for sz in size_groups:
+        null_per_size[sz] = np.array([
+            _gsea_compute_es(rank_scores, rng.choice(N, size=sz, replace=False))
+            for _ in range(n_perm)
+        ])
+
+    # NES and empirical p-values
+    records = []
+    for gs_name, es in obs_es.items():
+        sz = len(filtered[gs_name])
+        null_arr = null_per_size[sz]
+        pos_null = null_arr[null_arr > 0]
+        neg_null = null_arr[null_arr < 0]
+
+        if es >= 0:
+            mean_pos = pos_null.mean() if pos_null.size > 0 else 1.0
+            nes = es / mean_pos if mean_pos > 0 else float(es)
+            raw_p = float((pos_null >= es).sum() + 1) / (pos_null.size + 1) if pos_null.size else 1.0
+        else:
+            mean_neg = abs(neg_null.mean()) if neg_null.size > 0 else 1.0
+            nes = es / mean_neg if mean_neg > 0 else float(es)
+            raw_p = float((neg_null <= es).sum() + 1) / (neg_null.size + 1) if neg_null.size else 1.0
+
+        # Leading edge genes (contribute most to the enrichment)
+        idx = filtered[gs_name]
+        mask = np.zeros(N, dtype=bool)
+        mask[idx] = True
+        abs_r = np.abs(rank_scores)
+        nr = abs_r[mask].sum() or float(sz)
+        rs = np.cumsum(np.where(mask, abs_r / nr, -1.0 / (N - sz)))
+        if es >= 0:
+            peak = int(np.argmax(rs))
+            le_pos = sorted(idx[idx <= peak].tolist())[:8]
+        else:
+            trough = int(np.argmin(rs))
+            le_pos = sorted(idx[idx >= trough].tolist())[:8]
+        leading_edge = [genes_upper[i] for i in le_pos[:5]]
+
+        records.append({
+            "pathway": gs_name, "nes": round(float(nes), 3), "es": round(float(es), 4),
+            "p": round(float(raw_p), 6), "n_overlap": sz, "leading_edge": leading_edge,
+        })
+
+    df_res = pd.DataFrame(records)
+    _, adj_p_arr, _, _ = multipletests(df_res["p"].values, method="fdr_bh")
+    df_res["adj_p"] = adj_p_arr.round(6)
+    df_res = df_res.sort_values("nes", ascending=False).reset_index(drop=True)
+
+    top_up = df_res[df_res["nes"] > 0].head(topN).to_dict("records")
+    top_down = df_res[df_res["nes"] < 0].tail(topN).to_dict("records")[::-1]
+
+    sig_up = [r for r in top_up if r["adj_p"] < 0.25]
+    sig_down = [r for r in top_down if r["adj_p"] < 0.25]
+    interp_parts = []
+    if sig_up:
+        interp_parts.append(
+            f"UP: {sig_up[0]['pathway']} (NES={sig_up[0]['nes']:.2f}, adj_p={sig_up[0]['adj_p']:.4f})"
+        )
+    if sig_down:
+        interp_parts.append(
+            f"DOWN: {sig_down[0]['pathway']} (NES={sig_down[0]['nes']:.2f}, adj_p={sig_down[0]['adj_p']:.4f})"
+        )
+
+    comp_label = f"{comp['groupA']} vs {comp['groupB']}"
+    return {
+        "comparison": comp_label,
+        "deg_dataset": deg_dataset_name,
+        "rank_by": rank_by,
+        "n_genes_ranked": N,
+        "n_sets_tested": len(records),
+        "n_significant_fdr25": int((df_res["adj_p"] < 0.25).sum()),
+        "n_significant_fdr05": int((df_res["adj_p"] < 0.05).sum()),
+        "top_enriched_up": top_up,
+        "top_enriched_down": top_down,
+        "interpretation": "; ".join(interp_parts) if interp_parts else "No significant enrichment at FDR<0.25",
+    }
+
+
 def batch_detection(datasets, datasetName=None, genes=None, **_):
     ds = _get_ds(datasets, datasetName)
     expr: pd.DataFrame = ds["expr"]

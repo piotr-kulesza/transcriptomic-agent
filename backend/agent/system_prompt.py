@@ -101,6 +101,13 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
     if deg_datasets:
         deg_tools_block = (
             "\nDEG TABLE TOOLS (available when DEG tables are uploaded):\n"
+            "- gsea_enrichment: {deg_dataset_name, groupA, groupB, rank_by, topN} \u2014 "
+            "pre-ranked GSEA against GMT gene sets. Ranks ALL genes by signed logFC "
+            "(rank_by=\"signed_logfc\", default) or signed \u2212log10(adj_p) (rank_by=\"signed_neg_log_p\"). "
+            "Returns signed NES + adj_p for UP-enriched and DOWN-enriched gene sets. "
+            "Unlike pathway_enrichment (ORA), detects distributed moderate-effect signals without a cutoff. "
+            "REQUIRED: call gsea_enrichment for EVERY group-pair comparison you characterise "
+            "\u2014 do not rely solely on pathway_enrichment which is cutoff-biased and misses immune/OXPHOS signals.\n"
             "- deg_voting: {groupA, groupB, adj_p_threshold, logfc_threshold, topN} \u2014 "
             "per-gene vote count across DEG tables: frequency + direction consistency\n"
             "- deg_biomarker_ranking: {groupA, groupB, adj_p_threshold, logfc_threshold, topN} \u2014 "
@@ -109,7 +116,10 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
             "gene co-occurrence network across DEG tables; min_cooccurrence filters weak edges; "
             "if result contains a 'warning' field the network is trivial (< 3 comparisons) \u2014 skip interpretation and note the warning\n"
             "- deg_direction_comparison: {comparisonA_groupA, comparisonA_groupB, comparisonB_groupA, comparisonB_groupB} \u2014 "
-            "concordant/discordant genes between two comparisons\n"
+            "concordant/discordant genes between two comparisons. "
+            "Result includes coverage = n_shared_significant / n_union_significant. "
+            "RULE: when coverage < 0.5 you MUST NOT conclude the groups are 'similar', 'identical', "
+            "or 'concordant' \u2014 low coverage means most DE genes are comparison-specific; report as 'largely distinct signatures'.\n"
             "- network_meta_analysis: {groupA, groupB, topN} \u2014 "
             "Bucher indirect comparison method: derives logFC(A vs B) for group pairs not directly compared "
             "by summing logFCs along paths through the DEG comparison network (max 3 hops). "
@@ -121,14 +131,18 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
         strategy = (
             "STRATEGY (DEG-only mode \u2014 adapt freely):\n"
             "1. network_meta_analysis (no params) \u2014 run first to derive all indirect comparisons and establish the full group comparison landscape\n"
-            "2. deg_voting to identify most consistently DE genes across tables\n"
-            "3. cross_dataset_de for meta-analysis p-values and Fisher-combined significance\n"
-            "4. pathway_enrichment on top ranked genes (UP and DOWN separately; use deg_dataset_name to auto-extract)\n"
-            "5. deg_biomarker_ranking for composite biomarker candidates\n"
-            "6. deg_cooccurrence_network to find hub genes appearing together across tables\n"
-            "7. deg_direction_comparison if multiple disease types are available\n"
-            "8. execute_code for any custom computation on the DEG table data\n"
-            "9. DONE"
+            "2. gsea_enrichment \u2014 REQUIRED for every disease-vs-reference comparison you characterise; "
+            "call it BEFORE evaluating any pathway hypothesis; identifies both UP and DOWN enriched gene sets "
+            "including immune/MHC-II, inflammatory, OXPHOS, and proliferation programs that ORA misses\n"
+            "3. deg_voting to identify most consistently DE genes across tables\n"
+            "4. cross_dataset_de for meta-analysis p-values and Fisher-combined significance\n"
+            "5. pathway_enrichment for targeted ORA on specific curated gene lists (complements GSEA, does not replace it)\n"
+            "6. deg_biomarker_ranking for composite biomarker candidates\n"
+            "7. deg_cooccurrence_network to find hub genes appearing together across tables\n"
+            "8. deg_direction_comparison to compare two disease signatures \u2014 always check coverage; "
+            "do NOT claim similarity when coverage < 0.5\n"
+            "9. execute_code for any custom computation on the DEG table data\n"
+            "10. DONE"
         )
     else:
         strategy = (
@@ -216,6 +230,8 @@ IMPORTANT RULES FOR HYPOTHESIS TESTING:
 - Use execute_code only for analyses not covered by existing tools (e.g. custom visualizations, effect size calculations, novel metrics).
 - To investigate DE further, use the differential_expression tool (genome-wide) or cross_dataset_de \u2014 never a hand-picked gene list.
 - The expression data is already log-transformed (log2 scale, typical range 3\u201314). LogFC = mean(group_A) - mean(group_B) directly. Do NOT apply additional log2 transformation in execute_code \u2014 this would double-log the data and produce incorrect effect sizes.
+- MANDATORY RANKED ENRICHMENT: before concluding any characterisation of a group-pair comparison (disease vs reference), you MUST call gsea_enrichment on that comparison's DEG table. pathway_enrichment alone (ORA on a thresholded gene list) is insufficient \u2014 it is UP-axis biased and misses distributed immune, OXPHOS, and cell-cycle programs. If you have not called gsea_enrichment for a comparison, its pathway landscape is unknown \u2014 do not speculate.
+- FORBIDDEN SIMILARITY CLAIM: a "similar", "identical", "concordant", or ">X% concordance" verdict between two groups is FORBIDDEN when (a) deg_direction_comparison returns coverage < 0.5, OR (b) gsea_enrichment shows divergent top pathways between those two groups. High shared-gene concordance on a small intersection (coverage < 0.5) is NOT evidence of overall biological similarity \u2014 the correct phrasing is "limited DE overlap; signatures are largely distinct".
 
 TOOL-SPECIFIC INTERPRETATION RULES:
 - If subgroup_discovery returns "Subgroup too small after clustering", this means the group is transcriptionally homogeneous \u2014 no meaningful subtypes exist. Mark the subgroup hypothesis as REJECTED with this interpretation and move on. Do not retry with different parameters.
