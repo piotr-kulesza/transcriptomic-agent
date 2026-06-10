@@ -202,7 +202,7 @@ _METHOD_FAMILY: dict = {
     "pathway_enrichment":       "enrichment_ora",
     "deg_voting":               "deg_replication",
     "deg_biomarker_ranking":    "deg_replication",
-    "cross_dataset_de":         "deg_replication",
+    "cross_dataset_de":         "fisher_meta",
     "invariant_axis":           "deg_replication",
     "differential_expression":  "deg_replication",
     "network_meta_analysis":    "network",
@@ -214,61 +214,150 @@ _METHOD_FAMILY: dict = {
     "execute_code":             "custom",
 }
 
+# Enrichment methods test the same DE signal (correlated); need at least one ORTHOGONAL method
+# for genuine convergence.
+_ENRICHMENT_FAMILIES: frozenset = frozenset({"enrichment_ranked", "enrichment_ora"})
+_ORTHOGONAL_FAMILIES: frozenset = frozenset({
+    "deg_replication", "fisher_meta", "network", "direction", "subgroup", "custom",
+})
 
-def _extract_evidence_meta(action: str, result: dict) -> tuple:
-    """Return (n_datasets, best_fdr) from a tool result for evidence gating."""
-    n_datasets, best_fdr = 1, None
+
+def _extract_evidence_meta(action: str, result: dict,
+                            params: dict = None, deg_datasets: dict = None) -> tuple:
+    """
+    Return (dataset_ids: set[str], best_fdr: float|None).
+
+    dataset_ids is the set of underlying dataset/file identifiers that produced this result.
+    The union of dataset_ids across all evidence items must have size ≥2 for replication.
+    """
+    params = params or {}
+    deg_datasets = deg_datasets or {}
+    ds_ids: set = set()
+    best_fdr = None
+
     if not isinstance(result, dict) or result.get("error"):
-        return n_datasets, best_fdr
+        return ds_ids, best_fdr
+
     if action == "meta_gsea":
-        n_datasets = int(result.get("n_datasets_pooled", 1))
+        # contributing_datasets is now returned by meta_gsea (list of actual dataset names)
+        names = result.get("contributing_datasets", [])
+        if names:
+            ds_ids = set(names)
+        else:
+            # Fallback: use a comparison-keyed sentinel if the field is absent (old result)
+            ds_ids = {f"_meta_{result.get('comparison', '?')}_{result.get('n_datasets_pooled', 1)}"}
         fdrs = [r.get("fdr", 1.0) for r in result.get("top_enriched_up", []) + result.get("top_enriched_down", [])]
         best_fdr = float(min(fdrs)) if fdrs else None
+
     elif action == "gsea_enrichment":
+        deg_name = params.get("deg_dataset_name")
+        ds_ids = {deg_name} if deg_name else {"_gsea_unnamed"}
         ps = [r.get("adj_p", 1.0) for r in result.get("top_enriched_up", []) + result.get("top_enriched_down", [])]
         best_fdr = float(min(ps)) if ps else None
+
     elif action == "pathway_enrichment":
+        deg_name = params.get("deg_dataset_name")
+        if deg_name:
+            ds_ids = {deg_name}
+        else:
+            # ORA on a custom gene list — tie to no specific dataset (sentinel, not counted)
+            ds_ids = {"_ora_gene_list"}
         ps = [r.get("adj_p", 1.0) for r in result.get("top_enriched", [])]
         best_fdr = float(min(ps)) if ps else None
+
     elif action == "cross_dataset_de":
-        n_datasets = len(result.get("datasets_used", [])) or 1
+        used = result.get("datasets_used", [])
+        ds_ids = set(used) if used else {"_cde_unnamed"}
         fps = [r.get("fisher_adj_p", 1.0) for r in result.get("top_consistent_up", []) + result.get("top_consistent_down", [])]
         best_fdr = float(min(fps)) if fps else None
+
     elif action in ("deg_voting", "deg_biomarker_ranking", "deg_cooccurrence_network"):
-        n_datasets = int(result.get("n_comparisons", 1))
+        gA, gB = params.get("groupA"), params.get("groupB")
+        if gA and gB and deg_datasets:
+            matching = [
+                ds_name for ds_name, ds in deg_datasets.items()
+                for comp in ds["comparisons"]
+                if {comp["groupA"], comp["groupB"]} == {gA, gB}
+            ]
+            ds_ids = set(matching) if matching else {f"_deg_{gA}_{gB}"}
+        else:
+            ds_ids = set(deg_datasets.keys()) or {"_deg_unknown"}
+
     elif action == "invariant_axis":
-        n_datasets = int(result.get("n_datasets", 1))
+        n_ds = int(result.get("n_datasets", 1))
+        ds_ids = {f"_inv_raw_{i}" for i in range(n_ds)}
         bps = [g.get("p_bootstrap", 1.0) for g in result.get("top_invariant_genes", [])[:5]]
         best_fdr = float(min(bps)) if bps else None
+
     elif action == "differential_expression":
+        ds_name = result.get("dataset", "_de_unnamed")
+        ds_ids = {ds_name}
         top = result.get("top_upregulated", []) + result.get("top_downregulated", [])
         ps = [g.get("adj_p") for g in top if g.get("adj_p") is not None]
         best_fdr = float(min(ps)) if ps else None
+
     elif action == "network_meta_analysis":
-        n_datasets = int(result.get("n_direct_edges", 1))
-    return n_datasets, best_fdr
+        n_edges = int(result.get("n_direct_edges", 1))
+        ds_ids = {f"_nma_edge_{i}" for i in range(n_edges)}
+
+    else:
+        ds_ids = {"_unknown"}
+
+    return ds_ids, best_fdr
 
 
 def _check_confirmed_gate(hypothesis: dict) -> tuple:
-    """Return (can_confirm, issues). Requires ≥2 distinct method families, ≥2 datasets, FDR<0.05."""
+    """
+    Return (can_confirm, issues).
+    Requires:
+      1. ≥2 distinct method families with at least one from the orthogonal group
+         (enrichment_ranked + enrichment_ora alone is NOT sufficient)
+      2. Union of distinct underlying dataset IDs across all evidence ≥ 2
+      3. best FDR < 0.05 from at least one evidence item
+    """
     evidence = hypothesis.get("evidence", [])
     families = {e.get("method_family") for e in evidence if e.get("method_family")}
-    max_ds = max((e.get("n_datasets", 1) for e in evidence), default=1)
+    # Union of all underlying dataset names across every evidence item
+    all_ds: set = set()
+    for e in evidence:
+        all_ds.update(e.get("dataset_ids", []))
+    n_distinct = len(all_ds)
     fdrs = [e["best_fdr"] for e in evidence if e.get("best_fdr") is not None]
     best = min(fdrs) if fdrs else 1.0
     issues = []
+
+    # Convergence: ≥2 families AND at least one must be orthogonal
     if len(families) < 2:
         names = ", ".join(sorted(families)) or "none"
         issues.append(
-            f"convergence: only 1 method family ({names}); need ≥2 distinct families "
-            f"(e.g. enrichment_ranked+enrichment_ora, or enrichment_ranked+deg_replication). "
-            f"Note: two meta_gsea calls with different collection_prefix = still ONE family."
+            f"convergence: only 1 method family ({names}); need ≥2 distinct families. "
+            f"Two meta_gsea calls with different collection_prefix = still ONE family."
         )
-    if max_ds < 2:
-        issues.append(f"replication: max datasets={max_ds}; need n_datasets≥2 or n_datasets_pooled≥2")
+    else:
+        has_orthogonal = bool(families & _ORTHOGONAL_FAMILIES)
+        if not has_orthogonal:
+            issues.append(
+                f"convergence: families present ({', '.join(sorted(families))}) are all enrichment-group "
+                f"(enrichment_ranked + enrichment_ora both test the same DE signal — they are correlated). "
+                f"Need ≥1 orthogonal method: deg_replication, fisher_meta, network, or direction."
+            )
+
+    # Replication: union of REAL dataset IDs ≥ 2 (filter virtual sentinels that don't map to files)
+    _VIRTUAL = frozenset({"_ora_gene_list", "_gsea_unnamed", "_unknown"})
+    real_ds = all_ds - _VIRTUAL
+    n_distinct = len(real_ds)
+    if n_distinct < 2:
+        ds_str = ", ".join(sorted(real_ds)) or "none"
+        issues.append(
+            f"replication: only {n_distinct} distinct underlying dataset(s) ({ds_str}); "
+            f"need ≥2 independent datasets. Running multiple tools on the same dataset does NOT count. "
+            f"pathway_enrichment on a gene list (no deg_dataset_name) does not add replication credit."
+        )
+
     if best >= 0.05:
         fdr_str = f"{best:.4f}" if fdrs else "not recorded"
         issues.append(f"significance: best FDR={fdr_str}; need FDR<0.05 from at least one method")
+
     return (not issues), issues
 
 
@@ -664,13 +753,14 @@ async def run_agent_loop(
                     )
 
             if h is not None:
-                # Attach structured evidence
-                n_datasets, best_fdr = _extract_evidence_meta(action, result or {})
+                # Attach structured evidence: dataset_ids is the set of underlying sources
+                ds_ids, best_fdr = _extract_evidence_meta(action, result or {}, params=params, deg_datasets=deg_datasets)
                 ev_item = {
                     "step": step_num,
                     "action": action,
                     "method_family": _METHOD_FAMILY.get(action, "other"),
-                    "n_datasets": n_datasets,
+                    "dataset_ids": sorted(ds_ids),   # list for JSON-serialisability; union used in gate
+                    "n_datasets": len(ds_ids),        # kept for display
                     "best_fdr": best_fdr,
                     "reasoning": hypo_action.get("reasoning", ""),
                     "key_stats": extract_evidence_stats(action, result or {}, h.get("genes", [])),

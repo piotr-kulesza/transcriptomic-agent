@@ -267,22 +267,25 @@ def meta_gsea(datasets: list, deg_datasets: dict = None,
     if rnk.empty:
         return {"error": f"No data found for {groupA!r} vs {groupB!r} across any dataset"}
 
-    # Count contributing sources
-    n_raw = sum(
-        1 for ds in datasets
-        if sum(1 for s in ds["meta"].index[
-            ds["meta"][ds["group_col"]].apply(lambda g: resolve_group(g, mappings)) == groupA
-        ] if s in ds["expr"].columns) >= 2
-        and sum(1 for s in ds["meta"].index[
-            ds["meta"][ds["group_col"]].apply(lambda g: resolve_group(g, mappings)) == groupB
-        ] if s in ds["expr"].columns) >= 2
-    )
-    n_deg = sum(
-        1 for ds in (deg_datasets or {}).values()
+    # Collect actual contributing dataset names (needed for replication gating in runner)
+    raw_names = [
+        ds.get("name", f"raw_ds_{i}")
+        for i, ds in enumerate(datasets)
+        if (sum(1 for s in ds["meta"].index[
+                    ds["meta"][ds["group_col"]].apply(lambda g: resolve_group(g, mappings)) == groupA
+                ] if s in ds["expr"].columns) >= 2
+            and sum(1 for s in ds["meta"].index[
+                    ds["meta"][ds["group_col"]].apply(lambda g: resolve_group(g, mappings)) == groupB
+                ] if s in ds["expr"].columns) >= 2)
+    ]
+    deg_names = [
+        ds_name
+        for ds_name, ds in (deg_datasets or {}).items()
         for comp in ds["comparisons"]
         if {resolve_group(comp["groupA"], mappings), resolve_group(comp["groupB"], mappings)} == {groupA, groupB}
-    )
-    n_datasets = n_raw + n_deg
+    ]
+    contributing_datasets = sorted(set(raw_names + deg_names))
+    n_datasets = len(contributing_datasets)
 
     try:
         gene_sets = _load_gene_sets()
@@ -346,6 +349,7 @@ def meta_gsea(datasets: list, deg_datasets: dict = None,
     return {
         "comparison": f"{groupA} vs {groupB}",
         "n_datasets_pooled": n_datasets,
+        "contributing_datasets": contributing_datasets,
         "n_genes_ranked": len(rnk),
         "n_sets_tested": len(df_res),
         "n_significant_fdr25": int((df_res["fdr"] < 0.25).sum()),
