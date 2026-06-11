@@ -505,7 +505,7 @@ async def run_agent_loop(
         _step_usage = None
         try:
             async with client.messages.stream(
-                model="claude-sonnet-4-6",
+                model="claude-opus-4-8",
                 max_tokens=16000,
                 temperature=temperature,
                 system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
@@ -537,8 +537,8 @@ async def run_agent_loop(
             _out = _step_usage.output_tokens
             _cw  = getattr(_step_usage, "cache_creation_input_tokens", 0) or 0
             _cr  = getattr(_step_usage, "cache_read_input_tokens", 0) or 0
-            # claude-sonnet-4-6 pricing: $3/1M input, $15/1M output, $3.75/1M cache-write, $0.30/1M cache-read
-            step_cost = _in * 3e-6 + _out * 15e-6 + _cw * 3.75e-6 + _cr * 0.3e-6
+            # claude-opus-4-8 pricing: $15/1M input, $75/1M output, $18.75/1M cache-write, $1.50/1M cache-read
+            step_cost = _in * 15e-6 + _out * 75e-6 + _cw * 18.75e-6 + _cr * 1.5e-6
             total_cost_usd += step_cost
             yield {
                 "type": "usage",
