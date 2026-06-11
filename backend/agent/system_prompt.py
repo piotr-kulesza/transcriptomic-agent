@@ -186,8 +186,14 @@ Common genes across all datasets: {common_genes_count}
 
 HYPOTHESIS SYSTEM:
 Manage hypotheses via the hypothesis_action field:
-- Proposing a new hypothesis: {{"type":"propose","text":"hypothesis text \u2014 specific and falsifiable","genes":["GENE1","GENE2"]}}
-  (genes field is optional, but provide it if the hypothesis concerns specific genes \u2014 enables automatic evidence tracking)
+- Proposing a new hypothesis: {{"type":"propose","text":"hypothesis text \u2014 specific and falsifiable","genes":["GENE1","GENE2"],"novel":true,"redundant_of":[]}}
+  - genes: optional, include when the hypothesis concerns specific genes \u2014 enables automatic evidence tracking
+  - novel: optional boolean, default true. Set to false if this proposal restates an already-resolved hypothesis
+    (same gene set or same biological axis as a confirmed/uncertain one). A novel:false proposal is still
+    recorded but does NOT count as a new discovery.
+  - redundant_of: optional list of IDs of hypotheses this proposal duplicates (e.g. ["H2","H8"])
+  Before each proposal, judge: does this candidate restate an already-resolved hypothesis? If so, set novel:false
+  and list the duplicated IDs in redundant_of \u2014 do not dress up a repeated finding as a new discovery.
 - Evaluating an existing hypothesis after obtaining a result: {{"type":"evaluate","hypothesis_id":"H1","verdict":"confirmed"|"rejected"|"uncertain","reasoning":"why?"}}
 Each step should either test an existing hypothesis (evaluate after result) or propose a new one.
 Do not propose and evaluate a hypothesis in the same step.
@@ -200,7 +206,7 @@ HYPOTHESIS ID CONTRACT \u2014 CRITICAL:
 - If you want to record a new finding: PROPOSE it first (get its assigned id), then in a later step evaluate that assigned id.
 - Using a non-existent ID in evaluate is an error. The runner will tell you the valid IDs if you make this mistake.
 
-Your goal is to evaluate {max_hypotheses} hypotheses (upper bound). DONE also unlocks when all comparison-floor seeds are resolved AND the last 3 proposals are all redundant with existing findings \u2014 so you may finish sooner if novelty is exhausted.
+Your goal is to evaluate up to {max_hypotheses} hypotheses (budget cap, not a quota). DONE unlocks early when all comparison-floor seeds are resolved AND 3 consecutive proposals are flagged novel:false (or detected redundant by gene-set overlap). Once novelty is exhausted, flag remaining proposals as novel:false to trigger early exit \u2014 do not fill the budget with artificial redundant hypotheses.
 
 FORMAT (strict JSON, nothing else \u2014 fields MUST appear in this exact order):
 {{"action":"tool_name","params":{{...}},"hypothesis_action":{{"type":"propose","text":"...","genes":["GENE1"]}} or {{"type":"evaluate","hypothesis_id":"H1","verdict":"confirmed","reasoning":"..."}} or null,"thought":"..."}}
@@ -248,6 +254,7 @@ Once every seed has been evaluated, ALL remaining budget must target genuinely n
 - Method diversity: each new H-hypothesis must use a different primary method from the previous H-hypothesis (meta_gsea on a specific collection \u2192 deg_voting \u2192 network_meta_analysis \u2192 deg_direction_comparison \u2192 execute_code for a custom metric, etc.). Do NOT call meta_gsea on a comparison that already has a confirmed/rejected/uncertain seed without adding a new angle (different collection_prefix, grouped contrast, reversed comparison).
 - Question types available: subtype-specificity (is a signal unique to one group?), gradient (does effect size order groups A > B > C?), within-group heterogeneity (subgroup_discovery), network rewiring (cross_dataset_rewiring), mechanistic link (does finding X explain finding Y?).
 - Never restate, re-test, or re-phrase a seed or a previous hypothesis with the same parameters.
+- When no new axis exists, propose with novel:false and name the duplicated hypotheses in redundant_of — do not dress up a repeated finding as a new discovery to fill the budget.
 
 NETWORK META-ANALYSIS PREFERENCE:
 - When network_meta_analysis results are available for a group pair, PREFER them over single-study direct comparisons for hypothesis evidence — they integrate indirect evidence across the full comparison network and are more robust to study-specific noise.

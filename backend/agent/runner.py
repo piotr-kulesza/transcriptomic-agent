@@ -594,6 +594,8 @@ async def run_agent_loop(
         if isinstance(hypo_action, dict) and hypo_action.get("type") == "propose" and hypo_action.get("text"):
             hypo_counter += 1
             new_genes = hypo_action.get("genes", [])
+            agent_novel = bool(hypo_action.get("novel", True))
+            redundant_of = hypo_action.get("redundant_of", [])
             h = {
                 "id": f"H{hypo_counter}",
                 "text": hypo_action["text"],
@@ -602,12 +604,15 @@ async def run_agent_loop(
                 "evidence": [],
                 "proposed_at": step_num,
                 "seeded_by": "llm",
+                "novel": agent_novel,
+                "redundant_of": redundant_of,
             }
             hypotheses.append(h)
             yield {"type": "hypothesis_propose", "hypothesis": dict(h)}
-            # Track novelty: compare gene set to already-resolved hypotheses
+            # Track novelty: agent self-declaration AND gene-set Jaccard overlap
             resolved_so_far = [x for x in hypotheses[:-1] if x["status"] != "pending"]
-            novelty_window.append(_is_novel(new_genes, resolved_so_far))
+            gene_set_novel = _is_novel(new_genes, resolved_so_far)
+            novelty_window.append(agent_novel and gene_set_novel)
 
         loop = asyncio.get_event_loop()
 
@@ -633,14 +638,15 @@ async def run_agent_loop(
                     if pending_all:
                         detail = (
                             f"Pending hypotheses: {pending_all}. Evaluate these, or propose {remaining} "
-                            f"more novel hypotheses. DONE also unlocks when the last 3 proposals are all "
-                            f"redundant with existing findings (novelty window: {list(novelty_window)})."
+                            f"more novel hypotheses. DONE also unlocks when the last 3 consecutive proposals "
+                            f"are flagged novel:false (current novelty window: {list(novelty_window)})."
                         )
                     else:
                         detail = (
-                            f"Need {remaining} more evaluated hypotheses, or propose hypotheses until "
-                            f"3 in a row are redundant with existing findings "
-                            f"(novelty window: {list(novelty_window)})."
+                            f"Need {remaining} more evaluated hypotheses, or signal novelty exhaustion: "
+                            f"propose 3 consecutive hypotheses with novel:false (and redundant_of listing "
+                            f"which prior hypotheses they duplicate). "
+                            f"Current novelty window (True=novel, False=redundant): {list(novelty_window)}."
                         )
                 report_steps.append({"step": step_num, "thought": thought, "action": "DONE", "params": {},
                                      "blocked": f"DONE blocked: {detail}"})
