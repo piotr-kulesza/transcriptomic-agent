@@ -29,3 +29,10 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Generated run reports
+reports/
+
+# Large GMT files (download separately — see README)
+backend/combined.gmt
+*.gmt
