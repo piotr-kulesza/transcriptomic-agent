@@ -197,9 +197,9 @@ def _write_report(datasets: list, seed_summary: str, seed_data: dict, steps: lis
 # Method family mapping — multiple calls in the same family count as ONE for convergence.
 # Two meta_gsea calls with different collection_prefix = 1 family (enrichment_ranked), not 2.
 _METHOD_FAMILY: dict = {
-    "meta_gsea":                "enrichment_ranked",
-    "gsea_enrichment":          "enrichment_ranked",
-    "pathway_enrichment":       "enrichment_ora",
+    "meta_gsea":                "enrichment",   # preranked GSEA on DE signal
+    "gsea_enrichment":          "enrichment",   # per-file preranked GSEA — same family as meta_gsea
+    "pathway_enrichment":       "enrichment",   # hypergeometric ORA on DE signal — same family
     "deg_voting":               "deg_replication",
     "deg_biomarker_ranking":    "deg_replication",
     "cross_dataset_de":         "fisher_meta",
@@ -214,9 +214,10 @@ _METHOD_FAMILY: dict = {
     "execute_code":             "custom",
 }
 
-# Enrichment methods test the same DE signal (correlated); need at least one ORTHOGONAL method
-# for genuine convergence.
-_ENRICHMENT_FAMILIES: frozenset = frozenset({"enrichment_ranked", "enrichment_ora"})
+# All three enrichment tools (meta_gsea / gsea_enrichment / pathway_enrichment) test the same
+# DE signal and are collapsed into ONE family "enrichment". Any combination of them alone
+# counts as a single family (len < 2) and cannot satisfy convergence.
+_ENRICHMENT_FAMILIES: frozenset = frozenset({"enrichment"})
 _ORTHOGONAL_FAMILIES: frozenset = frozenset({
     "deg_replication", "fisher_meta", "network", "direction", "subgroup", "custom",
 })
@@ -311,7 +312,7 @@ def _check_confirmed_gate(hypothesis: dict) -> tuple:
     Return (can_confirm, issues).
     Requires:
       1. ≥2 distinct method families with at least one from the orthogonal group
-         (enrichment_ranked + enrichment_ora alone is NOT sufficient)
+         (meta_gsea + gsea_enrichment + pathway_enrichment all map to "enrichment" — ONE family)
       2. Union of distinct underlying dataset IDs across all evidence ≥ 2
       3. best FDR < 0.05 from at least one evidence item
     """
@@ -338,7 +339,7 @@ def _check_confirmed_gate(hypothesis: dict) -> tuple:
         if not has_orthogonal:
             issues.append(
                 f"convergence: families present ({', '.join(sorted(families))}) are all enrichment-group "
-                f"(enrichment_ranked + enrichment_ora both test the same DE signal — they are correlated). "
+                f"(meta_gsea / gsea_enrichment / pathway_enrichment all test the same DE signal). "
                 f"Need ≥1 orthogonal method: deg_replication, fisher_meta, network, or direction."
             )
 
