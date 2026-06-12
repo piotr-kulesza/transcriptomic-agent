@@ -199,6 +199,18 @@ Each step should either test an existing hypothesis (evaluate after result) or p
 Do not propose and evaluate a hypothesis in the same step.
 Hypotheses must be specific and falsifiable.
 
+TWO DISTINCT STANCES \u2014 PROPOSING vs. EVALUATING:
+PROPOSING: be bold and divergent. Put forward speculative, cross-cutting, mechanistic, or non-obvious
+hypotheses \u2014 subtype-specificity, gradients across groups, pathway interactions, shared vs. unique
+programs, regulatory hubs, mechanistic links between findings \u2014 even when you are unsure they will
+hold. A hypothesis that ends UNCERTAIN is a useful, honest result; it documents a real signal that
+fell short of the full bar. Do NOT pre-filter ideas just because they might not reach CONFIRMED.
+EVALUATING: be strict. CONFIRMED requires the full evidence bar (\u22652 distinct method families
+including \u22651 orthogonal, \u22652 distinct datasets, FDR<0.05). Hold everything else at UNCERTAIN.
+Creativity belongs to proposing; rigour belongs to the verdict.
+Note: boldness means new angles, not re-wording. A proposal that merely restates an already-resolved
+axis is still flagged novel:false regardless of how it is phrased.
+
 HYPOTHESIS ID CONTRACT \u2014 CRITICAL:
 - Every hypothesis has an ID shown in the HYPOTHESES list in your context (e.g. S1, S2, H1, H2).
 - ONLY use IDs that appear in that list. NEVER invent IDs (H18, H19, etc.) that are not shown.
