@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import re
-from collections import deque
 from datetime import datetime
 from typing import AsyncGenerator
 
@@ -71,6 +70,7 @@ def _extract_first_json_object(s: str):
 
 from ..agent.system_prompt import build_system_prompt
 from ..agent.seeder import generate_seeds, extract_evidence_stats
+from ..agent.coverage import build_coverage_grid, K_OFF_GRID, _MAX_AUTO_RAISE
 from ..tools.registry import TOOLS, CROSS_TOOL_NAMES, DEG_TOOL_NAMES, summarize_result
 from ..tools.sandbox import execute_sandbox
 
@@ -418,11 +418,17 @@ async def run_agent_loop(
     # ── Pre-analysis seeding ──────────────────────────────────────────────────
     loop = asyncio.get_event_loop()
     seeds, seed_summary, seed_data = await loop.run_in_executor(None, lambda: generate_seeds(datasets, mappings=mappings, deg_datasets=deg_datasets))
-    # Auto-raise budget so every comparison seed can be evaluated before DONE
-    n_comparison_seeds = sum(1 for s in seeds if s.get("seeded_by") == "auto_gsea")
-    max_hypotheses = max(max_hypotheses, n_comparison_seeds)
+    _deg_only = len(datasets) == 0 and bool(deg_datasets)
+    # Build deterministic coverage grid (G1, G2, ...)
+    grid_hypotheses = build_coverage_grid(datasets, deg_datasets, mappings, _deg_only)
+    n_auto_gsea = sum(1 for s in seeds if s.get("seeded_by") == "auto_gsea")
+    n_grid = len(grid_hypotheses)
+    # Auto-raise budget: floor + grid + off-grid headroom, capped at _MAX_AUTO_RAISE
+    min_budget = n_auto_gsea + n_grid + K_OFF_GRID
+    orig_max = max_hypotheses
+    max_hypotheses = min(max(max_hypotheses, min_budget), _MAX_AUTO_RAISE)
     max_steps = max_hypotheses * 5  # safety cap: generous budget per hypothesis
-    system_prompt = build_system_prompt(datasets, len(common_genes), seed_summary=seed_summary, deg_datasets=deg_datasets, max_hypotheses=max_hypotheses)
+    system_prompt = build_system_prompt(datasets, len(common_genes), seed_summary=seed_summary, deg_datasets=deg_datasets, max_hypotheses=max_hypotheses, k_off_grid=K_OFF_GRID)
     if mappings:
         mapping_text = "\n".join(
             f"  '{canonical}' = {aliases}"
@@ -431,24 +437,29 @@ async def run_agent_loop(
         system_prompt += f"\n\nGROUP MAPPINGS (use these canonical names in cross-dataset tools):\n{mapping_text}"
     messages = []
     discoveries = []
-    hypotheses: list[dict] = list(seeds)   # pre-populated with S1, S2, ...
-    hypo_counter = 0                        # agent-proposed: H1, H2, ...
-    report_steps: list[dict] = []           # collected for final report
-    last_call: tuple = None                 # (action, params_json) of previous step
-    once_only_called: set = set()           # tools that may only be called once per run
-    total_cost_usd: float = 0.0             # accumulated API cost for this run
-    novelty_window: deque = deque(maxlen=3) # True=novel, False=redundant; last 3 agent proposals
-    novelty_exhausted_at_step: int | None = None  # step when 3 consecutive novel:false first occurred
-    post_exhaustion_evidence: set = set()          # hypothesis IDs with ≥1 evidence added post-exhaustion
-    _ONCE_ONLY = {"cross_dataset_de"}       # tools restricted to a single call per run
-    # When no raw expression datasets are loaded, only DEG-compatible tools may run
-    _deg_only = len(datasets) == 0 and bool(deg_datasets)
+    hypotheses: list[dict] = list(seeds) + list(grid_hypotheses)  # S…, G…; H… appended during loop
+    hypo_counter = 0                    # agent-proposed: H1, H2, ...
+    report_steps: list[dict] = []       # collected for final report
+    last_call: tuple = None             # (action, params_json) of previous step
+    once_only_called: set = set()       # tools that may only be called once per run
+    total_cost_usd: float = 0.0         # accumulated API cost for this run
+    post_grid_evidence: set = set()     # hypothesis IDs with ≥1 evidence added after grid covered
+    _ONCE_ONLY = {"cross_dataset_de"}   # tools restricted to a single call per run
     _DEG_ONLY_ALLOWED = {"cross_dataset_de", "pathway_enrichment", "execute_code", "DONE"} | DEG_TOOL_NAMES
 
     yield {"type": "mode", "mode": "reproduce" if temperature == 0.0 else "explore", "temperature": temperature}
-    yield {"type": "seed", "text": f"Pre-analysis: {len(seeds)} seed hypotheses generated", "summary": seed_summary}
+    if max_hypotheses != orig_max:
+        yield {"type": "seed", "text": (
+            f"Budget auto-raised from {orig_max} to {max_hypotheses} "
+            f"to cover {n_auto_gsea} floor seeds + {n_grid} grid cells + {K_OFF_GRID} off-grid slots."
+        ), "summary": ""}
+    yield {"type": "seed", "text": (
+        f"Pre-analysis: {len(seeds)} seed hypotheses + {n_grid} grid cells generated"
+    ), "summary": seed_summary}
     for s in seeds:
         yield {"type": "hypothesis_propose", "hypothesis": dict(s)}
+    for g in grid_hypotheses:
+        yield {"type": "hypothesis_propose", "hypothesis": dict(g)}
 
     for i in range(max_steps):
         step_num = i + 1
@@ -458,12 +469,27 @@ async def run_agent_loop(
             "Discoveries:\n" + "\n".join(f"- [{d['action']}] {d['summary']}" for d in discoveries[-8:])
             if discoveries else "First step."
         )
+        # Build hypothesis display: show all PENDING in full; condensed for evaluated
+        _pending_h = [h for h in hypotheses if h["status"] == "pending"]
+        _eval_h    = [h for h in hypotheses if h["status"] != "pending"]
         hypo_lines = []
-        for h in hypotheses:
+        for h in _pending_h:
             ev = len(h.get("evidence", []))
             short = h["text"][:80] + ("…" if len(h["text"]) > 80 else "")
             ev_tag = f", {ev}ev" if ev else ""
-            hypo_lines.append(f"  {h['id']} [{h['status'].upper()}{ev_tag}]: {short}")
+            if h.get("seeded_by") == "grid":
+                qt_tag = f" [grid:{h.get('question_type','?')}→{h.get('tool','?')}]"
+            else:
+                qt_tag = ""
+            hypo_lines.append(f"  {h['id']} [PENDING{ev_tag}]{qt_tag}: {short}")
+        # Show last 12 evaluated in condensed form to limit context
+        _show_eval = _eval_h[-12:]
+        if len(_eval_h) > 12:
+            hypo_lines.append(f"  … {len(_eval_h) - 12} earlier evaluated hypotheses not shown …")
+        for h in _show_eval:
+            ev = len(h.get("evidence", []))
+            ev_tag = f", {ev}ev" if ev else ""
+            hypo_lines.append(f"  {h['id']} [{h['status'].upper()}{ev_tag}]")
         hypo_summary = (
             "\nHYPOTHESES (use these exact IDs — never invent IDs):\n" + "\n".join(hypo_lines)
             if hypo_lines else ""
@@ -471,26 +497,45 @@ async def run_agent_loop(
 
         summary_block = f"{discovery_summary}{hypo_summary}"
         evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
-        _ne = novelty_exhausted_at_step is not None
+        # Grid coverage: all G-hypotheses evaluated (empty grid → True)
+        _gc = not any(h["status"] == "pending" for h in hypotheses if h.get("seeded_by") == "grid")
         _no_pending = not any(h["status"] == "pending" for h in hypotheses)
         _uncertain_now = {h["id"] for h in hypotheses if h["status"] == "uncertain"}
-        _all_corroborated = _uncertain_now.issubset(post_exhaustion_evidence)
+        _all_corroborated = _uncertain_now.issubset(post_grid_evidence)
+        _next_grid = next(
+            (h for h in hypotheses if h.get("seeded_by") == "grid" and h["status"] == "pending"),
+            None,
+        )
+        _floor_seeds_done = not any(
+            h["status"] == "pending"
+            for h in hypotheses if h.get("seeded_by") == "auto_gsea"
+        )
+
         if is_last:
             user_content = (
                 f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\n"
                 "FINAL STEP — safety limit reached. Evaluate any remaining hypotheses as uncertain and call DONE."
             )
-        elif _no_pending and (evaluated >= max_hypotheses or (_ne and _all_corroborated)):
+        elif _no_pending and (_gc and _all_corroborated or evaluated >= max_hypotheses):
             user_content = (
                 f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated — TARGET REACHED]. {summary_block}\n\n"
                 "You have evaluated all required hypotheses. Write a comprehensive final summary as the thought field — "
                 "cover each hypothesis verdict with key evidence and statistics, the most important genes and their expression patterns, "
                 "key pathways and mechanisms identified, and an overall biological conclusion. Then call DONE."
             )
-        elif _ne:
+        elif _gc:
+            # Grid covered — corroboration mode (off-grid H-proposals still allowed)
+            _off_grid_n = sum(1 for h in hypotheses if h.get("seeded_by") == "llm")
+            _off_grid_rem = max(0, K_OFF_GRID - _off_grid_n)
             _pending_ids = [h["id"] for h in hypotheses if h["status"] == "pending"]
-            _uncorroborated = sorted(_uncertain_now - post_exhaustion_evidence)
-            _msg_parts = ["NOVELTY EXHAUSTED — corroboration mode. Do not propose further hypotheses."]
+            _uncorroborated = sorted(_uncertain_now - post_grid_evidence)
+            _msg_parts = [f"GRID COVERED ({n_grid}/{n_grid} cells done). Corroboration mode."]
+            if _off_grid_rem > 0 and not _pending_ids:
+                _msg_parts.append(
+                    f"Off-grid budget: {_off_grid_n}/{K_OFF_GRID} proposals used; "
+                    f"you may propose up to {_off_grid_rem} more genuinely novel hypotheses "
+                    f"not covered by any grid cell."
+                )
             if _pending_ids:
                 _msg_parts.append(
                     f"Pending hypotheses (never evaluated): {_pending_ids}. "
@@ -500,16 +545,36 @@ async def run_agent_loop(
                 _msg_parts.append(
                     f"Uncertain hypotheses needing corroboration: {_uncorroborated}. "
                     "For each: add the missing orthogonal method family or a second dataset replication. "
-                    "If genuinely impossible to upgrade (single-source, FDR never reaches 0.05), "
-                    "make one attempt anyway — the attempt itself unblocks DONE even if the verdict stays uncertain."
+                    "If genuinely impossible to upgrade, make one attempt — "
+                    "the attempt itself unblocks DONE even if the verdict stays uncertain."
                 )
             if not _pending_ids and not _uncorroborated:
                 _msg_parts.append(
                     "All hypotheses resolved and corroborated. Write your final summary and call DONE."
                 )
             user_content = (
-                f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated — NOVELTY EXHAUSTED]. "
+                f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated — GRID COVERED]. "
                 f"{summary_block}\n\n" + " ".join(_msg_parts)
+            )
+        elif _next_grid is not None and _floor_seeds_done:
+            # Floor seeds done; guide agent to next grid cell
+            tp = _next_grid.get("tool_params", {})
+            params_str = (
+                ", ".join(f"{k}={repr(v)}" for k, v in sorted(tp.items()))
+                if tp else "(no params)"
+            )
+            n_done_grid = sum(
+                1 for h in hypotheses
+                if h.get("seeded_by") == "grid" and h["status"] != "pending"
+            )
+            grid_hint = (
+                f"GRID CELL {_next_grid['id']} ({n_done_grid}/{n_grid} done) — "
+                f"question_type={_next_grid.get('question_type','?')}: "
+                f"use {_next_grid.get('tool','?')}({params_str}) and evaluate {_next_grid['id']}."
+            )
+            user_content = (
+                f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. "
+                f"{summary_block}\n\n{grid_hint}"
             )
         else:
             user_content = f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\nWhat will you investigate?"
@@ -639,64 +704,64 @@ async def run_agent_loop(
             }
             hypotheses.append(h)
             yield {"type": "hypothesis_propose", "hypothesis": dict(h)}
-            # Track novelty: agent self-declaration AND gene-set Jaccard overlap
-            resolved_so_far = [x for x in hypotheses[:-1] if x["status"] != "pending"]
-            gene_set_novel = _is_novel(new_genes, resolved_so_far)
-            novelty_window.append(agent_novel and gene_set_novel)
-            if novelty_exhausted_at_step is None and len(novelty_window) >= 3 and not any(novelty_window):
-                novelty_exhausted_at_step = step_num
+            # Note: novel/redundant_of fields are stored on the hypothesis for documentation
+            # but no longer drive the DONE gate (grid coverage is the deterministic trigger)
 
         loop = asyncio.get_event_loop()
 
         if action == "DONE":
             evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
-            floor_seeds = [h for h in hypotheses if h.get("seeded_by") == "auto_gsea"]
-            floor_done = all(h["status"] != "pending" for h in floor_seeds)
+            # floor = auto_gsea seeds + grid cells (both must be fully evaluated before DONE)
+            floor_and_grid = [
+                h for h in hypotheses
+                if h.get("seeded_by") in ("auto_gsea", "grid")
+            ]
+            floor_done = all(h["status"] != "pending" for h in floor_and_grid)
             no_pending = not any(h["status"] == "pending" for h in hypotheses)
-            novelty_exhausted = novelty_exhausted_at_step is not None
             uncertain_at_done = {h["id"] for h in hypotheses if h["status"] == "uncertain"}
-            all_corroborated = uncertain_at_done.issubset(post_exhaustion_evidence)
-            # DONE requires: floor done, no pending, AND (budget met OR novelty exhausted+corroborated)
+            all_corroborated = uncertain_at_done.issubset(post_grid_evidence)
+            # DONE requires: floor+grid done, no pending, AND (budget met OR fully corroborated)
             can_done = is_last or (
                 floor_done and no_pending and (
-                    evaluated >= max_hypotheses or
-                    (novelty_exhausted and all_corroborated)
+                    evaluated >= max_hypotheses or all_corroborated
                 )
             )
             if not can_done:
-                pending_floor = [h["id"] for h in floor_seeds if h["status"] == "pending"]
-                pending_all = [h["id"] for h in hypotheses if h["status"] == "pending"]
+                pending_floor = [h["id"] for h in floor_and_grid if h["status"] == "pending"]
+                pending_grid  = [h["id"] for h in hypotheses if h.get("seeded_by") == "grid" and h["status"] == "pending"]
+                pending_all   = [h["id"] for h in hypotheses if h["status"] == "pending"]
                 logger.warning(
-                    "DONE blocked at step %d: floor_done=%s no_pending=%s novelty_exhausted=%s "
-                    "all_corroborated=%s eval=%d/%d",
-                    step_num, floor_done, no_pending, novelty_exhausted, all_corroborated,
-                    evaluated, max_hypotheses,
+                    "DONE blocked at step %d: floor_done=%s no_pending=%s "
+                    "all_corroborated=%s eval=%d/%d pending_grid=%s",
+                    step_num, floor_done, no_pending, all_corroborated,
+                    evaluated, max_hypotheses, pending_grid,
                 )
                 if not floor_done:
-                    detail = (
-                        f"Floor comparison seeds still pending: {pending_floor}. "
-                        f"Call meta_gsea for each and evaluate before calling DONE."
-                    )
+                    pending_seeds = [h["id"] for h in floor_and_grid if h["status"] == "pending" and h.get("seeded_by") == "auto_gsea"]
+                    if pending_seeds:
+                        detail = (
+                            f"Floor comparison seeds still pending: {pending_seeds}. "
+                            f"Call meta_gsea for each and evaluate before calling DONE."
+                        )
+                    else:
+                        detail = (
+                            f"Grid cells still pending: {pending_grid}. "
+                            f"Work through them in order — each specifies a question_type and suggested tool."
+                        )
                 elif not no_pending:
                     detail = (
                         f"Hypotheses still PENDING (never evaluated): {pending_all}. "
                         f"Gather evidence and evaluate each to confirmed/uncertain/rejected before calling DONE."
                     )
-                elif not novelty_exhausted:
-                    remaining = max_hypotheses - evaluated
-                    detail = (
-                        f"Need {remaining} more evaluated hypotheses, or signal novelty exhaustion: "
-                        f"propose 3 consecutive hypotheses with novel:false (and redundant_of listing "
-                        f"which prior hypotheses they duplicate). "
-                        f"Current novelty window (True=novel, False=redundant): {list(novelty_window)}."
-                    )
                 elif not all_corroborated:
-                    uncorroborated = sorted(uncertain_at_done - post_exhaustion_evidence)
+                    uncorroborated = sorted(uncertain_at_done - post_grid_evidence)
+                    remaining = max_hypotheses - evaluated
                     detail = (
                         f"Corroboration required for: {uncorroborated}. "
                         f"Gather at least one new evidence item for each of these UNCERTAIN hypotheses — "
                         f"try a different method family or a second dataset replication. "
-                        f"The hypothesis may stay UNCERTAIN — just make the attempt."
+                        f"The hypothesis may stay UNCERTAIN — just make the attempt. "
+                        f"({remaining} budget slots remain if you need more H-proposals first.)"
                     )
                 else:
                     detail = "Cannot call DONE yet — check hypothesis states."
@@ -792,10 +857,6 @@ async def run_agent_loop(
                     }
                     hypotheses.append(h_new)
                     yield {"type": "hypothesis_propose", "hypothesis": dict(h_new)}
-                    resolved_so_far = [x for x in hypotheses[:-1] if x["status"] != "pending"]
-                    novelty_window.append(_is_novel(new_genes, resolved_so_far))
-                    if novelty_exhausted_at_step is None and len(novelty_window) >= 3 and not any(novelty_window):
-                        novelty_exhausted_at_step = step_num
                     logger.info("Auto-registered unknown id %s as %s at step %d", hid, new_id, step_num)
                     _eval_correction = (
                         f"NOTICE: hypothesis_id '{hid}' was not found. Your text was registered as "
@@ -827,8 +888,27 @@ async def run_agent_loop(
                     "key_stats": extract_evidence_stats(action, result or {}, h.get("genes", [])),
                 }
                 h["evidence"].append(ev_item)
-                if novelty_exhausted_at_step is not None:
-                    post_exhaustion_evidence.add(h["id"])
+                # Post-grid corroboration tracking
+                _gc_now = not any(
+                    x["status"] == "pending"
+                    for x in hypotheses if x.get("seeded_by") == "grid"
+                )
+                if _gc_now:
+                    post_grid_evidence.add(h["id"])
+                # Warn when agent uses a different tool than the grid cell suggests
+                if h.get("seeded_by") == "grid" and action != h.get("tool", action):
+                    logger.warning(
+                        "Grid cell %s suggests tool '%s' but agent used '%s' at step %d",
+                        h["id"], h.get("tool"), action, step_num,
+                    )
+                    yield {
+                        "type": "error",
+                        "text": (
+                            f"Note: grid cell {h['id']} suggests tool '{h.get('tool')}' "
+                            f"but you used '{action}'. The evidence is recorded; "
+                            f"consider using the suggested tool for richer evidence."
+                        ),
+                    }
 
                 # Gate the verdict
                 verdict = hypo_action.get("verdict", "uncertain")

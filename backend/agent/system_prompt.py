@@ -1,4 +1,4 @@
-def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: str = "", deg_datasets: dict = None, max_hypotheses: int = 3) -> str:
+def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: str = "", deg_datasets: dict = None, max_hypotheses: int = 3, k_off_grid: int = 3) -> str:
     ds_desc = "\n".join(
         f"  \u2022 {ds['name']}: {len(ds['expr'].index)} genes, {len(ds['expr'].columns)} samples, groups: [{', '.join(ds['groups'])}]"
         for ds in datasets
@@ -212,13 +212,21 @@ Note: boldness means new angles, not re-wording. A proposal that merely restates
 axis is still flagged novel:false regardless of how it is phrased.
 
 HYPOTHESIS ID CONTRACT \u2014 CRITICAL:
-- Every hypothesis has an ID shown in the HYPOTHESES list in your context (e.g. S1, S2, H1, H2).
-- ONLY use IDs that appear in that list. NEVER invent IDs (H18, H19, etc.) that are not shown.
-- To evaluate a hypothesis: first see its ID in the list, then use that exact ID in hypothesis_action.
-- If you want to record a new finding: PROPOSE it first (get its assigned id), then in a later step evaluate that assigned id.
+- S1..Sn = seeder-generated from pre-analysis (floor seeds \u2014 pairwise comparison characterisation)
+- G1..Gn = grid cells (pre-defined cross-cutting analysis targets \u2014 work through in ascending order)
+- H1..Hn = agent-proposed during the loop (off-grid; up to 3 after grid is covered)
+- ONLY use IDs that appear in the HYPOTHESES list. NEVER invent IDs not shown there.
+- G-cells show [grid:question_type\u2192tool] in the HYPOTHESES list \u2014 use the indicated tool and evaluate
+  the G-cell in that same step (no separate propose step needed \u2014 the hypothesis is already registered).
+- To record a genuinely new finding not covered by any grid cell: PROPOSE it (H-prefix), then evaluate.
 - Using a non-existent ID in evaluate is an error. The runner will tell you the valid IDs if you make this mistake.
 
-Your goal is to evaluate up to {max_hypotheses} hypotheses (budget cap, not a quota). DONE unlocks early when all comparison-floor seeds are resolved AND 3 consecutive proposals are flagged novel:false (or detected redundant by gene-set overlap). Once novelty is exhausted, flag remaining proposals as novel:false to trigger early exit \u2014 do not fill the budget with artificial redundant hypotheses.
+Your goal is to evaluate up to {max_hypotheses} hypotheses (budget cap). DONE unlocks when:
+(a) all floor seeds (S-prefix) are evaluated, AND
+(b) all grid cells (G-prefix) are evaluated, AND
+(c) no hypothesis is PENDING, AND
+(d) every UNCERTAIN hypothesis has had at least one corroboration attempt after the grid was covered.
+After the grid is covered you may propose up to {k_off_grid} off-grid (H-prefix) hypotheses for genuine surprises not addressed by any grid cell; these are optional. Then corroborate and call DONE.
 
 FORMAT (strict JSON, nothing else \u2014 fields MUST appear in this exact order):
 {{"action":"tool_name","params":{{...}},"hypothesis_action":{{"type":"propose","text":"...","genes":["GENE1"]}} or {{"type":"evaluate","hypothesis_id":"H1","verdict":"confirmed","reasoning":"..."}} or null,"thought":"..."}}
@@ -261,19 +269,27 @@ HYPOTHESIS EVALUATION RULES:
 - NEVER call DONE while any hypothesis is still PENDING. Every proposed
   hypothesis must be resolved to confirmed/uncertain/rejected before the run ends.
 
-HYPOTHESIS TIERS \u2014 floor vs. novelty dial:
-The per-comparison meta-GSEA seeds S1..Sn are a COVERAGE FLOOR: one per unique group-pair comparison. They guarantee every comparison is characterized before DONE.
-Once every seed has been evaluated, ALL remaining budget must target genuinely new questions \u2014 not re-runs of the floor:
-- Cross-cutting: propose hypotheses that span \u22652 comparisons (e.g. what is shared vs. specific across groups; monotonic gradient ordering across groups; what one group shares with a second but not a third).
-- Method diversity: each new H-hypothesis must use a different primary method from the previous H-hypothesis (meta_gsea on a specific collection \u2192 deg_voting \u2192 network_meta_analysis \u2192 deg_direction_comparison \u2192 execute_code for a custom metric, etc.). Do NOT call meta_gsea on a comparison that already has a confirmed/rejected/uncertain seed without adding a new angle (different collection_prefix, grouped contrast, reversed comparison).
-- Question types available: subtype-specificity (is a signal unique to one group?), gradient (does effect size order groups A > B > C?), within-group heterogeneity (subgroup_discovery), network rewiring (cross_dataset_rewiring), mechanistic link (does finding X explain finding Y?).
-- Never restate, re-test, or re-phrase a seed or a previous hypothesis with the same parameters.
-- When no new axis exists, propose with novel:false and name the duplicated hypotheses in redundant_of — do not dress up a repeated finding as a new discovery to fill the budget.
-- After 3 consecutive novel:false proposals (novelty exhausted), the run enters CORROBORATION MODE:
-  stop proposing entirely. Your remaining steps must add the missing orthogonal method family or
-  the missing dataset replication for each UNCERTAIN hypothesis, and resolve any PENDING ones.
-  DONE unlocks once every UNCERTAIN hypothesis has had at least one corroboration attempt —
-  a hypothesis that stays UNCERTAIN after the attempt is a valid, honest result.
+HYPOTHESIS TIERS:
+TIER 1 \u2014 FLOOR SEEDS (S-prefix): one per unique group-pair comparison. Evaluate each using
+  meta_gsea. These guarantee every comparison is characterised before DONE.
+TIER 2 \u2014 GRID CELLS (G-prefix): pre-defined cross-cutting analyses covering the full analysis
+  space deterministically. Work through them in ascending order (G1, G2, G3, \u2026) after floor seeds.
+  Each G-cell shows [grid:question_type\u2192tool] in the HYPOTHESES list. Run the suggested tool
+  and evaluate the G-cell in that same step \u2014 no separate propose step needed.
+  - gradient: network_meta_analysis() (no params \u2014 all indirect pairs) \u2192 order the groups.
+  - shared_vs_unique: deg_direction_comparison with the cell's comparisonA/comparisonB params.
+  - biomarker: deg_biomarker_ranking with the cell's groupA/groupB params.
+  - hub: deg_cooccurrence_network (DEG-only) or gene_network_hub (raw) with the cell's params.
+  - subtype: subgroup_discovery with the cell's datasetName/group params.
+  If the suggested tool returns no signal, mark the G-cell UNCERTAIN \u2014 do NOT leave it PENDING.
+TIER 3 \u2014 OFF-GRID (H-prefix): after the grid is fully covered, you may propose up to {k_off_grid}
+  genuinely novel hypotheses not addressed by any grid cell. Skip this tier if no novel ideas exist.
+CORROBORATION MODE (after grid covered): gather the missing orthogonal method family or second dataset
+  for each UNCERTAIN hypothesis. A hypothesis that stays UNCERTAIN after one attempt is valid \u2014 the
+  attempt itself unblocks DONE.
+- Never restate, re-test, or re-phrase a seed or a grid cell or a previous hypothesis.
+- If an off-grid (H) proposal restates an already-resolved axis, propose it with novel:false and
+  redundant_of listing the duplicated IDs \u2014 do not pad the run with artificial discoveries.
 
 NETWORK META-ANALYSIS PREFERENCE:
 - When network_meta_analysis results are available for a group pair, PREFER them over single-study direct comparisons for hypothesis evidence — they integrate indirect evidence across the full comparison network and are more robust to study-specific noise.
