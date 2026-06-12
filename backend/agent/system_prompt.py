@@ -258,6 +258,8 @@ HYPOTHESIS EVALUATION RULES:
   evidence. UNCERTAIN means evidence is mixed or insufficient.
   PENDING means no evidence collected yet \u2014 it should not persist
   beyond the step where evidence was gathered.
+- NEVER call DONE while any hypothesis is still PENDING. Every proposed
+  hypothesis must be resolved to confirmed/uncertain/rejected before the run ends.
 
 HYPOTHESIS TIERS \u2014 floor vs. novelty dial:
 The per-comparison meta-GSEA seeds S1..Sn are a COVERAGE FLOOR: one per unique group-pair comparison. They guarantee every comparison is characterized before DONE.
@@ -267,6 +269,11 @@ Once every seed has been evaluated, ALL remaining budget must target genuinely n
 - Question types available: subtype-specificity (is a signal unique to one group?), gradient (does effect size order groups A > B > C?), within-group heterogeneity (subgroup_discovery), network rewiring (cross_dataset_rewiring), mechanistic link (does finding X explain finding Y?).
 - Never restate, re-test, or re-phrase a seed or a previous hypothesis with the same parameters.
 - When no new axis exists, propose with novel:false and name the duplicated hypotheses in redundant_of — do not dress up a repeated finding as a new discovery to fill the budget.
+- After 3 consecutive novel:false proposals (novelty exhausted), the run enters CORROBORATION MODE:
+  stop proposing entirely. Your remaining steps must add the missing orthogonal method family or
+  the missing dataset replication for each UNCERTAIN hypothesis, and resolve any PENDING ones.
+  DONE unlocks once every UNCERTAIN hypothesis has had at least one corroboration attempt —
+  a hypothesis that stays UNCERTAIN after the attempt is a valid, honest result.
 
 NETWORK META-ANALYSIS PREFERENCE:
 - When network_meta_analysis results are available for a group pair, PREFER them over single-study direct comparisons for hypothesis evidence — they integrate indirect evidence across the full comparison network and are more robust to study-specific noise.

@@ -438,6 +438,8 @@ async def run_agent_loop(
     once_only_called: set = set()           # tools that may only be called once per run
     total_cost_usd: float = 0.0             # accumulated API cost for this run
     novelty_window: deque = deque(maxlen=3) # True=novel, False=redundant; last 3 agent proposals
+    novelty_exhausted_at_step: int | None = None  # step when 3 consecutive novel:false first occurred
+    post_exhaustion_evidence: set = set()          # hypothesis IDs with ≥1 evidence added post-exhaustion
     _ONCE_ONLY = {"cross_dataset_de"}       # tools restricted to a single call per run
     # When no raw expression datasets are loaded, only DEG-compatible tools may run
     _deg_only = len(datasets) == 0 and bool(deg_datasets)
@@ -469,17 +471,45 @@ async def run_agent_loop(
 
         summary_block = f"{discovery_summary}{hypo_summary}"
         evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
+        _ne = novelty_exhausted_at_step is not None
+        _no_pending = not any(h["status"] == "pending" for h in hypotheses)
+        _uncertain_now = {h["id"] for h in hypotheses if h["status"] == "uncertain"}
+        _all_corroborated = _uncertain_now.issubset(post_exhaustion_evidence)
         if is_last:
             user_content = (
                 f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\n"
                 "FINAL STEP — safety limit reached. Evaluate any remaining hypotheses as uncertain and call DONE."
             )
-        elif evaluated >= max_hypotheses:
+        elif _no_pending and (evaluated >= max_hypotheses or (_ne and _all_corroborated)):
             user_content = (
                 f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated — TARGET REACHED]. {summary_block}\n\n"
                 "You have evaluated all required hypotheses. Write a comprehensive final summary as the thought field — "
                 "cover each hypothesis verdict with key evidence and statistics, the most important genes and their expression patterns, "
                 "key pathways and mechanisms identified, and an overall biological conclusion. Then call DONE."
+            )
+        elif _ne:
+            _pending_ids = [h["id"] for h in hypotheses if h["status"] == "pending"]
+            _uncorroborated = sorted(_uncertain_now - post_exhaustion_evidence)
+            _msg_parts = ["NOVELTY EXHAUSTED — corroboration mode. Do not propose further hypotheses."]
+            if _pending_ids:
+                _msg_parts.append(
+                    f"Pending hypotheses (never evaluated): {_pending_ids}. "
+                    "Gather evidence and evaluate each to confirmed/uncertain/rejected."
+                )
+            if _uncorroborated:
+                _msg_parts.append(
+                    f"Uncertain hypotheses needing corroboration: {_uncorroborated}. "
+                    "For each: add the missing orthogonal method family or a second dataset replication. "
+                    "If genuinely impossible to upgrade (single-source, FDR never reaches 0.05), "
+                    "make one attempt anyway — the attempt itself unblocks DONE even if the verdict stays uncertain."
+                )
+            if not _pending_ids and not _uncorroborated:
+                _msg_parts.append(
+                    "All hypotheses resolved and corroborated. Write your final summary and call DONE."
+                )
+            user_content = (
+                f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated — NOVELTY EXHAUSTED]. "
+                f"{summary_block}\n\n" + " ".join(_msg_parts)
             )
         else:
             user_content = f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\nWhat will you investigate?"
@@ -613,6 +643,8 @@ async def run_agent_loop(
             resolved_so_far = [x for x in hypotheses[:-1] if x["status"] != "pending"]
             gene_set_novel = _is_novel(new_genes, resolved_so_far)
             novelty_window.append(agent_novel and gene_set_novel)
+            if novelty_exhausted_at_step is None and len(novelty_window) >= 3 and not any(novelty_window):
+                novelty_exhausted_at_step = step_num
 
         loop = asyncio.get_event_loop()
 
@@ -620,34 +652,54 @@ async def run_agent_loop(
             evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
             floor_seeds = [h for h in hypotheses if h.get("seeded_by") == "auto_gsea"]
             floor_done = all(h["status"] != "pending" for h in floor_seeds)
-            novelty_exhausted = len(novelty_window) >= 3 and not any(novelty_window)
-            # DONE allowed when: safety last-step, OR floor done AND (budget met OR novelty exhausted)
-            can_done = is_last or (floor_done and (evaluated >= max_hypotheses or novelty_exhausted))
+            no_pending = not any(h["status"] == "pending" for h in hypotheses)
+            novelty_exhausted = novelty_exhausted_at_step is not None
+            uncertain_at_done = {h["id"] for h in hypotheses if h["status"] == "uncertain"}
+            all_corroborated = uncertain_at_done.issubset(post_exhaustion_evidence)
+            # DONE requires: floor done, no pending, AND (budget met OR novelty exhausted+corroborated)
+            can_done = is_last or (
+                floor_done and no_pending and (
+                    evaluated >= max_hypotheses or
+                    (novelty_exhausted and all_corroborated)
+                )
+            )
             if not can_done:
                 pending_floor = [h["id"] for h in floor_seeds if h["status"] == "pending"]
-                logger.warning("DONE blocked at step %d: floor_done=%s novelty_exhausted=%s eval=%d/%d",
-                               step_num, floor_done, novelty_exhausted, evaluated, max_hypotheses)
+                pending_all = [h["id"] for h in hypotheses if h["status"] == "pending"]
+                logger.warning(
+                    "DONE blocked at step %d: floor_done=%s no_pending=%s novelty_exhausted=%s "
+                    "all_corroborated=%s eval=%d/%d",
+                    step_num, floor_done, no_pending, novelty_exhausted, all_corroborated,
+                    evaluated, max_hypotheses,
+                )
                 if not floor_done:
                     detail = (
                         f"Floor comparison seeds still pending: {pending_floor}. "
                         f"Call meta_gsea for each and evaluate before calling DONE."
                     )
-                else:
+                elif not no_pending:
+                    detail = (
+                        f"Hypotheses still PENDING (never evaluated): {pending_all}. "
+                        f"Gather evidence and evaluate each to confirmed/uncertain/rejected before calling DONE."
+                    )
+                elif not novelty_exhausted:
                     remaining = max_hypotheses - evaluated
-                    pending_all = [h["id"] for h in hypotheses if h["status"] == "pending"]
-                    if pending_all:
-                        detail = (
-                            f"Pending hypotheses: {pending_all}. Evaluate these, or propose {remaining} "
-                            f"more novel hypotheses. DONE also unlocks when the last 3 consecutive proposals "
-                            f"are flagged novel:false (current novelty window: {list(novelty_window)})."
-                        )
-                    else:
-                        detail = (
-                            f"Need {remaining} more evaluated hypotheses, or signal novelty exhaustion: "
-                            f"propose 3 consecutive hypotheses with novel:false (and redundant_of listing "
-                            f"which prior hypotheses they duplicate). "
-                            f"Current novelty window (True=novel, False=redundant): {list(novelty_window)}."
-                        )
+                    detail = (
+                        f"Need {remaining} more evaluated hypotheses, or signal novelty exhaustion: "
+                        f"propose 3 consecutive hypotheses with novel:false (and redundant_of listing "
+                        f"which prior hypotheses they duplicate). "
+                        f"Current novelty window (True=novel, False=redundant): {list(novelty_window)}."
+                    )
+                elif not all_corroborated:
+                    uncorroborated = sorted(uncertain_at_done - post_exhaustion_evidence)
+                    detail = (
+                        f"Corroboration required for: {uncorroborated}. "
+                        f"Gather at least one new evidence item for each of these UNCERTAIN hypotheses — "
+                        f"try a different method family or a second dataset replication. "
+                        f"The hypothesis may stay UNCERTAIN — just make the attempt."
+                    )
+                else:
+                    detail = "Cannot call DONE yet — check hypothesis states."
                 report_steps.append({"step": step_num, "thought": thought, "action": "DONE", "params": {},
                                      "blocked": f"DONE blocked: {detail}"})
                 messages.append({"role": "assistant", "content": raw})
@@ -742,6 +794,8 @@ async def run_agent_loop(
                     yield {"type": "hypothesis_propose", "hypothesis": dict(h_new)}
                     resolved_so_far = [x for x in hypotheses[:-1] if x["status"] != "pending"]
                     novelty_window.append(_is_novel(new_genes, resolved_so_far))
+                    if novelty_exhausted_at_step is None and len(novelty_window) >= 3 and not any(novelty_window):
+                        novelty_exhausted_at_step = step_num
                     logger.info("Auto-registered unknown id %s as %s at step %d", hid, new_id, step_num)
                     _eval_correction = (
                         f"NOTICE: hypothesis_id '{hid}' was not found. Your text was registered as "
@@ -773,6 +827,8 @@ async def run_agent_loop(
                     "key_stats": extract_evidence_stats(action, result or {}, h.get("genes", [])),
                 }
                 h["evidence"].append(ev_item)
+                if novelty_exhausted_at_step is not None:
+                    post_exhaustion_evidence.add(h["id"])
 
                 # Gate the verdict
                 verdict = hypo_action.get("verdict", "uncertain")
