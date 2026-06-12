@@ -1,4 +1,4 @@
-def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: str = "", deg_datasets: dict = None, max_hypotheses: int = 3, k_off_grid: int = 3) -> str:
+def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: str = "", deg_datasets: dict = None, max_hypotheses: int = 3, k_off_grid: int = 3, layer1_summary: str = "") -> str:
     ds_desc = "\n".join(
         f"  \u2022 {ds['name']}: {len(ds['expr'].index)} genes, {len(ds['expr'].columns)} samples, groups: [{', '.join(ds['groups'])}]"
         for ds in datasets
@@ -135,37 +135,38 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
 
     if deg_only:
         strategy = (
-            "STRATEGY (DEG-only mode \u2014 adapt freely):\n"
-            "1. network_meta_analysis (no params) \u2014 run first to map the full comparison landscape\n"
-            "2. meta_gsea \u2014 REQUIRED for EVERY group-pair comparison you characterise; call BEFORE evaluating "
-            "any pathway hypothesis; pools all datasets via Stouffer Z so distributed signals reach FDR<0.05. "
-            "Each seed hypothesis S1..Sn already identifies the top signal \u2014 use meta_gsea to verify both "
-            "UP and DOWN axes for that comparison.\n"
-            "3. deg_voting to identify most consistently DE genes\n"
-            "4. cross_dataset_de for Fisher meta-analysis gene lists\n"
-            "5. pathway_enrichment for targeted ORA on specific curated gene lists (complementary to meta_gsea)\n"
-            "6. deg_biomarker_ranking for composite biomarker candidates\n"
-            "7. deg_cooccurrence_network to find hub genes\n"
-            "8. deg_direction_comparison to compare two disease signatures \u2014 always check coverage; "
-            "do NOT claim similarity when coverage < 0.5\n"
-            "9. gsea_enrichment for per-file QC/heterogeneity checks only\n"
-            "10. execute_code for custom computation\n"
-            "11. DONE"
+            "STRATEGY (Layer 2 \u2014 DEG-only mode):\n"
+            "You are in Layer 2: all S and G hypotheses are already CONFIRMED or UNCERTAIN (see Layer 1 results above).\n"
+            "Your job: (1) synthesise the Layer 1 picture; (2) propose off-grid H-hypotheses for signals "
+            "not covered by any grid cell; (3) corroborate UNCERTAIN hypotheses.\n"
+            "1. SYNTHESISE: in your first thought, describe which axes are confirmed, which are uncertain, "
+            "and what patterns (shared axes, gradient ordering, specificity) emerge from Layer 1.\n"
+            "2. PROPOSE: off-grid H-hypotheses for genuinely new questions the grid did not cover "
+            "\u2014 cross-cutting mechanistic links, interaction effects, outlier groups, gradient deviations, "
+            "context-specific signals. Use the full tool set. Explore until novelty is exhausted "
+            "(novel:false when you have no more new ideas relative to the full Layer 1 picture).\n"
+            "3. CORROBORATE: for each UNCERTAIN S or G hypothesis, attempt at least one additional "
+            "orthogonal method or second dataset. If still UNCERTAIN, that is a valid result \u2014 document it.\n"
+            "4. DONE when off-grid novelty exhausted AND no H-hypotheses PENDING AND "
+            "every UNCERTAIN hypothesis has had a corroboration attempt."
         )
     else:
         strategy = (
-            "STRATEGY:\n"
-            "1. Hypotheses S1..Sn are already loaded from pre-analysis (PENDING) \u2014 start by investigating them with tools\n"
-            "2. cross_dataset_de / invariant_axis \u2192 test hypothesis, then evaluate it\n"
-            "3. If hypothesis confirmed \u2192 go deeper (pathway_enrichment, gene_network_hub)\n"
-            "4. If rejected \u2192 formulate an alternative hypothesis (propose)\n"
-            "5. batch_detection for discovered axes\n"
-            "6. subgroup_discovery for interesting groups\n"
-            "7. execute_code when you need something custom\n"
-            "8. Each step should follow logically from the previous \u2014 do not repeat the same parameters"
+            "STRATEGY (Layer 2 \u2014 raw expression mode):\n"
+            "You are in Layer 2: all S and G hypotheses are already CONFIRMED or UNCERTAIN (see Layer 1 results above).\n"
+            "Your job: (1) synthesise the Layer 1 picture; (2) propose off-grid H-hypotheses; (3) corroborate UNCERTAIN.\n"
+            "1. SYNTHESISE: describe confirmed axes, uncertain ones, and emergent patterns from Layer 1.\n"
+            "2. PROPOSE: off-grid hypotheses \u2014 mechanistic links, interaction effects, subgroup deviations, "
+            "rewiring. Use cross_dataset_de / invariant_axis / subgroup_discovery / gene_network_hub / execute_code.\n"
+            "3. CORROBORATE: for UNCERTAIN S or G hypotheses, gather a second orthogonal method.\n"
+            "4. DONE when off-grid novelty exhausted AND no H-hypotheses PENDING AND every UNCERTAIN attempted."
         )
 
-    return f"""You are an autonomous scientific agent for discovering transcriptomic relationships across multiple datasets.
+    return f"""You are a scientific agent working in Layer 2 mode: the deterministic Layer 1 engine has already evaluated all floor seeds and grid cells. Your role is synthesis + off-grid discovery — not re-running the grid.
+
+{layer1_summary}
+
+You are an autonomous scientific agent for discovering transcriptomic relationships across multiple datasets.
 
 DATASETS ({len(datasets)}):
 {ds_desc}

@@ -10,11 +10,12 @@ import itertools
 from ..tools.cross import resolve_group
 
 # Off-grid budget: agent-proposed H-hypotheses allowed after grid is covered
-K_OFF_GRID: int = 3
+# Layer 2 explores until novelty exhausted (3 consecutive novel:false), up to this cap
+K_OFF_GRID: int = 15
 # Hard cap on grid cells — prevents balloon for large many-group datasets
 _MAX_GRID_CELLS: int = 20
 # Safety ceiling on auto-raised max_hypotheses
-_MAX_AUTO_RAISE: int = 60
+_MAX_AUTO_RAISE: int = 80
 
 
 def _canonical_pair(a: str, b: str) -> tuple[str, str]:
@@ -105,7 +106,29 @@ def build_coverage_grid(
             ),
         })
 
-    # ── Priority 2: shared_vs_unique ──────────────────────────────────────
+    # ── Priority 2: specificity (one-vs-rest) ────────────────────────────────
+    # For each group G appearing in ≥2 canonical pairs, test what is specific to G
+    # vs all other groups. Engine implements via _one_vs_rest_de + meta_gsea.
+    for g in groups_sorted:
+        comps_g = sorted([p for p in pairs_sorted if g in p])
+        if len(comps_g) < 2:
+            continue
+        other_groups = sorted({h for p in comps_g for h in p if h != g})
+        raw.append({
+            "priority": 2,
+            "sort_key": g,
+            "question_type": "specificity",
+            "tool": "one_vs_rest",
+            "tool_params": {"group": g},
+            "text": (
+                f"Group {g} has a specific transcriptomic signature distinct from all "
+                f"other groups ({', '.join(other_groups[:4])}"
+                + (f" ... +{len(other_groups)-4} more" if len(other_groups) > 4 else "")
+                + f") across {len(comps_g)} comparisons."
+            ),
+        })
+
+    # ── Priority 3: shared_vs_unique ──────────────────────────────────────
     # For each group G that appears in ≥2 canonical pairs, compare its first
     # two comparisons (sorted → deterministic) via deg_direction_comparison.
     group_to_pairs: dict[str, list[tuple]] = {}
@@ -126,7 +149,7 @@ def build_coverage_grid(
         a1, b1 = c1
         a2, b2 = c2
         raw.append({
-            "priority": 2,
+            "priority": 3,
             "sort_key": f"{a1}|{b1}|{a2}|{b2}",
             "question_type": "shared_vs_unique",
             "tool": "deg_direction_comparison",
@@ -161,7 +184,7 @@ def build_coverage_grid(
         if n_total == 0:
             continue
         raw.append({
-            "priority": 3,
+            "priority": 4,
             "sort_key": f"{a}|{b}",
             "question_type": "biomarker",
             "tool": "deg_biomarker_ranking",
@@ -181,7 +204,7 @@ def build_coverage_grid(
             if n_deg < 3:
                 continue
             raw.append({
-                "priority": 4,
+                "priority": 5,
                 "sort_key": f"{a}|{b}",
                 "question_type": "hub",
                 "tool": "deg_cooccurrence_network",
@@ -198,7 +221,7 @@ def build_coverage_grid(
             if meta is None or len(meta) < 30:
                 continue
             raw.append({
-                "priority": 4,
+                "priority": 5,
                 "sort_key": ds["name"],
                 "question_type": "hub",
                 "tool": "gene_network_hub",
@@ -218,7 +241,7 @@ def build_coverage_grid(
                 continue
             for raw_g in sorted({str(g) for g in meta[gc].dropna().unique()}):
                 raw.append({
-                    "priority": 5,
+                    "priority": 6,
                     "sort_key": f"{ds['name']}|{raw_g}",
                     "question_type": "subtype",
                     "tool": "subgroup_discovery",
