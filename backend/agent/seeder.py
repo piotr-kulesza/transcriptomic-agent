@@ -14,6 +14,7 @@ from statsmodels.stats.multitest import multipletests
 
 from ..tools.cross import cross_dataset_de, resolve_group, meta_rank
 from ..tools.single import _gsea_compute_es, _load_gene_sets
+from ..agent.orient import canonical_order
 
 
 def _top_gsea_hit(df_genes: pd.DataFrame, n_perm: int = 100,
@@ -114,7 +115,7 @@ def _top_gsea_hit(df_genes: pd.DataFrame, n_perm: int = 100,
     }
 
 
-def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = None) -> tuple[list[dict], str, dict]:
+def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = None, reference: str = None) -> tuple[list[dict], str, dict]:
     """
     Run genome-wide MWU + BH pre-analysis per dataset/group-pair and return
     (seed_hypotheses, seed_summary_text, seed_data).
@@ -300,14 +301,14 @@ def generate_seeds(datasets: list, mappings: dict = None, deg_datasets: dict = N
             summary_lines.append(f"  {ds_name}: DEG summary error — {e}")
 
     # One meta-GSEA seed per unique canonical comparison pair
-    seen_pairs: dict = {}  # canonical_key → (gA, gB) first-occurrence orientation
+    seen_pairs: dict = {}  # canonical_key → (gA, gB) in CANONICAL orientation
     for ds in _deg.values():
         for comp in ds["comparisons"]:
             gA = resolve_group(comp["groupA"], _mappings_here)
             gB = resolve_group(comp["groupB"], _mappings_here)
             key = tuple(sorted([gA, gB]))
             if key not in seen_pairs:
-                seen_pairs[key] = (gA, gB)
+                seen_pairs[key] = canonical_order(gA, gB, reference)
 
     for key, (gA, gB) in seen_pairs.items():
         try:

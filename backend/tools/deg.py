@@ -80,15 +80,21 @@ def deg_voting(datasets: list, deg_datasets: dict = None,
     top = results[:topN]
     fully_consistent = [r for r in results if r["consistent"]]
 
+    orient_note = (
+        f"[orientation: {groupA} vs {groupB}; logFC>0 = higher in {groupA}] "
+        if groupA and groupB else ""
+    )
     return {
         "n_comparisons": n_datasets,
         "n_genes_any": len(results),
         "n_genes_fully_consistent": len(fully_consistent),
         "top_genes": top,
+        "orientation": f"{groupA} vs {groupB}; logFC>0 = higher in {groupA}" if groupA and groupB else "",
         "interpretation": (
+            orient_note +
             f"Top: {top[0]['gene']} ({top[0]['n_datasets']}/{n_datasets} datasets, "
             f"{top[0]['direction']}, mean logFC={top[0]['mean_logFC']})"
-            if top else "No consistent genes found"
+            if top else orient_note + "No consistent genes found"
         ),
     }
 

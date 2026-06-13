@@ -24,6 +24,7 @@ from ..tools.deg import (
     network_meta_analysis,
 )
 from .coverage import _canonical_pair
+from .orient import canonical_order, orientation_note
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +88,19 @@ def _deg_ds_ids(deg_datasets: dict, gA: str, gB: str, mappings: dict) -> set[str
     return ds_ids
 
 
-def _ev_item(action: str, result: dict, ds_ids: set, fdr: Optional[float], reasoning: str) -> dict:
-    return {
+def _ev_item(
+    action: str,
+    result: dict,
+    ds_ids: set,
+    fdr: Optional[float],
+    reasoning: str,
+    orientation: str = "",
+    enriched_up: list = None,
+    enriched_down: list = None,
+    genes_up: list = None,
+    genes_down: list = None,
+) -> dict:
+    item: dict = {
         "step": 0,
         "action": action,
         "method_family": _METHOD_FAMILY.get(action, "other"),
@@ -97,7 +109,17 @@ def _ev_item(action: str, result: dict, ds_ids: set, fdr: Optional[float], reaso
         "best_fdr": fdr,
         "reasoning": reasoning,
         "key_stats": {},
+        "orientation": orientation,
     }
+    if enriched_up is not None:
+        item["enriched_up"] = enriched_up
+    if enriched_down is not None:
+        item["enriched_down"] = enriched_down
+    if genes_up is not None:
+        item["genes_up"] = genes_up
+    if genes_down is not None:
+        item["genes_down"] = genes_down
+    return item
 
 
 # ---------------------------------------------------------------------------
@@ -135,15 +157,26 @@ def _eval_floor(datasets, deg_datasets, mappings, gA, gB):
         families.add("deg_replication")
 
     verdict, issues = _gate(families, all_ds, fdr_gsea)
+    orient = f"{gA} vs {gB}"
     ev = []
     if not r_gsea.get("error"):
-        ev.append(_ev_item("meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"meta-GSEA {gA} vs {gB}"))
+        ev.append(_ev_item(
+            "meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"meta-GSEA {gA} vs {gB}",
+            orientation=orient,
+            enriched_up=[r.get("pathway", "") for r in r_gsea.get("top_enriched_up", [])],
+            enriched_down=[r.get("pathway", "") for r in r_gsea.get("top_enriched_down", [])],
+        ))
     if not r_vote.get("error"):
-        ev.append(_ev_item("deg_voting", r_vote, ds_vote, None, f"voting {gA} vs {gB}"))
+        ev.append(_ev_item(
+            "deg_voting", r_vote, ds_vote, None, f"voting {gA} vs {gB}",
+            orientation=orient,
+            genes_up=[g.get("gene", "") for g in r_vote.get("top_genes", []) if g.get("direction") == "UP"],
+            genes_down=[g.get("gene", "") for g in r_vote.get("top_genes", []) if g.get("direction") == "DOWN"],
+        ))
     return verdict, ev, issues
 
 
-def _eval_gradient(datasets, deg_datasets, mappings, groups_sorted):
+def _eval_gradient(datasets, deg_datasets, mappings, groups_sorted, reference=None):
     """Gradient: network_meta_analysis + Spearman monotonic test + meta_gsea for top pair."""
     try:
         r_nma = network_meta_analysis(datasets, mappings=mappings, deg_datasets=deg_datasets)
@@ -197,7 +230,7 @@ def _eval_gradient(datasets, deg_datasets, mappings, groups_sorted):
     # Orthogonal: meta_gsea for the pair with largest estimated contrast
     r_gsea, fdr_gsea, ds_gsea = {"error": "no top pair"}, None, set()
     if len(scored) >= 2:
-        gA_top, gB_top = scored[0][0], scored[-1][0]
+        gA_top, gB_top = canonical_order(scored[0][0], scored[-1][0], reference)
         r_gsea, fdr_gsea, ds_gsea = _run_gsea(datasets, deg_datasets, mappings, gA_top, gB_top)
         nma_ds |= ds_gsea
 
@@ -208,9 +241,15 @@ def _eval_gradient(datasets, deg_datasets, mappings, groups_sorted):
         best_fdr = min(best_fdr or 1.0, fdr_gsea or 1.0) or None
 
     verdict, issues = _gate(families, nma_ds, best_fdr)
+    top_orient = f"{gA_top} vs {gB_top}" if len(scored) >= 2 else ""
     ev = [_ev_item("network_meta_analysis", r_nma, nma_ds, gradient_fdr if gradient_fdr < 1.0 else None, reasoning)]
     if not r_gsea.get("error"):
-        ev.append(_ev_item("meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"enrichment for top gradient pair"))
+        ev.append(_ev_item(
+            "meta_gsea", r_gsea, ds_gsea, fdr_gsea, "enrichment for top gradient pair",
+            orientation=top_orient,
+            enriched_up=[r.get("pathway", "") for r in r_gsea.get("top_enriched_up", [])],
+            enriched_down=[r.get("pathway", "") for r in r_gsea.get("top_enriched_down", [])],
+        ))
     return verdict, ev, issues
 
 
@@ -239,9 +278,15 @@ def _eval_shared_vs_unique(datasets, deg_datasets, mappings, a1, b1, a2, b2):
     ev = []
     if not r_dir.get("error"):
         ev.append(_ev_item("deg_direction_comparison", r_dir, ds_dir, None,
-                           f"concordant/unique DE: {a1}v{b1} and {a2}v{b2}"))
+                           f"concordant/unique DE: {a1}v{b1} and {a2}v{b2}",
+                           orientation=f"{a1} vs {b1} / {a2} vs {b2}"))
     if not r_gsea.get("error"):
-        ev.append(_ev_item("meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"enrichment {a1} vs {b1}"))
+        ev.append(_ev_item(
+            "meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"enrichment {a1} vs {b1}",
+            orientation=f"{a1} vs {b1}",
+            enriched_up=[r.get("pathway", "") for r in r_gsea.get("top_enriched_up", [])],
+            enriched_down=[r.get("pathway", "") for r in r_gsea.get("top_enriched_down", [])],
+        ))
     return verdict, ev, issues
 
 
@@ -262,12 +307,23 @@ def _eval_biomarker(datasets, deg_datasets, mappings, gA, gB):
     if not r_gsea.get("error"):
         families.add("enrichment")
 
+    orient = f"{gA} vs {gB}"
     verdict, issues = _gate(families, all_ds, fdr_gsea)
     ev = []
     if not r_bio.get("error"):
-        ev.append(_ev_item("deg_biomarker_ranking", r_bio, ds_bio, None, f"biomarker ranking {gA} vs {gB}"))
+        ev.append(_ev_item(
+            "deg_biomarker_ranking", r_bio, ds_bio, None, f"biomarker ranking {gA} vs {gB}",
+            orientation=orient,
+            genes_up=[g.get("gene", "") for g in r_bio.get("top_biomarkers", []) if g.get("direction") == "UP"],
+            genes_down=[g.get("gene", "") for g in r_bio.get("top_biomarkers", []) if g.get("direction") == "DOWN"],
+        ))
     if not r_gsea.get("error"):
-        ev.append(_ev_item("meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"enrichment {gA} vs {gB}"))
+        ev.append(_ev_item(
+            "meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"enrichment {gA} vs {gB}",
+            orientation=orient,
+            enriched_up=[r.get("pathway", "") for r in r_gsea.get("top_enriched_up", [])],
+            enriched_down=[r.get("pathway", "") for r in r_gsea.get("top_enriched_down", [])],
+        ))
     return verdict, ev, issues
 
 
@@ -301,12 +357,18 @@ def _eval_hub(datasets, deg_datasets, mappings, gA, gB, deg_only, tool_params):
     if not r_gsea.get("error"):
         families.add("enrichment")
 
+    orient = f"{gA} vs {gB}" if gA and gB else ""
     verdict, issues = _gate(families, all_ds, fdr_gsea)
     ev = []
     if not r_hub.get("error"):
-        ev.append(_ev_item(hub_action, r_hub, ds_hub, None, f"hub genes {gA} vs {gB}"))
+        ev.append(_ev_item(hub_action, r_hub, ds_hub, None, f"hub genes {gA} vs {gB}", orientation=orient))
     if not r_gsea.get("error"):
-        ev.append(_ev_item("meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"enrichment {gA} vs {gB}"))
+        ev.append(_ev_item(
+            "meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"enrichment {gA} vs {gB}",
+            orientation=orient,
+            enriched_up=[r.get("pathway", "") for r in r_gsea.get("top_enriched_up", [])],
+            enriched_down=[r.get("pathway", "") for r in r_gsea.get("top_enriched_down", [])],
+        ))
     return verdict, ev, issues
 
 
@@ -370,7 +432,7 @@ def _one_vs_rest_de(
     }
 
 
-def _eval_specificity(datasets, deg_datasets, mappings, group):
+def _eval_specificity(datasets, deg_datasets, mappings, group, reference=None):
     """one_vs_rest_de (deg_replication) + meta_gsea for the most-sourced comparison (enrichment)."""
     r_ovr = _one_vs_rest_de(deg_datasets, group, mappings)
     ds_ovr: set[str] = set()
@@ -399,8 +461,11 @@ def _eval_specificity(datasets, deg_datasets, mappings, group):
                 best_pair = (group, other)
 
     r_gsea, fdr_gsea, ds_gsea = {"error": "no comparison"}, None, set()
+    gsea_orient = ""
     if best_pair:
-        r_gsea, fdr_gsea, ds_gsea = _run_gsea(datasets, deg_datasets, mappings, *best_pair)
+        bp = canonical_order(best_pair[0], best_pair[1], reference)
+        r_gsea, fdr_gsea, ds_gsea = _run_gsea(datasets, deg_datasets, mappings, bp[0], bp[1])
+        gsea_orient = f"{bp[0]} vs {bp[1]}"
 
     all_ds = ds_ovr | ds_gsea
     families: set[str] = set()
@@ -412,10 +477,16 @@ def _eval_specificity(datasets, deg_datasets, mappings, group):
     verdict, issues = _gate(families, all_ds, fdr_gsea)
     ev = []
     if not r_ovr.get("error"):
-        ev.append(_ev_item("deg_voting", r_ovr, ds_ovr, None, f"one-vs-rest specificity for '{group}'"))
+        ev.append(_ev_item("deg_voting", r_ovr, ds_ovr, None, f"one-vs-rest specificity for '{group}'",
+                           genes_up=[g.get("gene", "") for g in r_ovr.get("top_genes", []) if g.get("direction") == "UP"],
+                           genes_down=[g.get("gene", "") for g in r_ovr.get("top_genes", []) if g.get("direction") == "DOWN"]))
     if not r_gsea.get("error"):
-        label = f"{best_pair[0]} vs {best_pair[1]}" if best_pair else "?"
-        ev.append(_ev_item("meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"enrichment {label}"))
+        ev.append(_ev_item(
+            "meta_gsea", r_gsea, ds_gsea, fdr_gsea, f"enrichment {gsea_orient}",
+            orientation=gsea_orient,
+            enriched_up=[r.get("pathway", "") for r in r_gsea.get("top_enriched_up", [])],
+            enriched_down=[r.get("pathway", "") for r in r_gsea.get("top_enriched_down", [])],
+        ))
     return verdict, ev, issues
 
 
@@ -429,6 +500,7 @@ def characterize(
     mappings: dict,
     deg_only: bool,
     hypotheses: list[dict],
+    reference: str = None,
 ) -> dict[str, dict]:
     """
     Deterministic engine: evaluate all auto_gsea seeds and grid cells.
@@ -469,9 +541,9 @@ def characterize(
 
             elif seeded_by == "grid":
                 if qt == "gradient":
-                    verdict, evidence, issues = _eval_gradient(datasets, deg_datasets, mappings, all_groups)
+                    verdict, evidence, issues = _eval_gradient(datasets, deg_datasets, mappings, all_groups, reference=reference)
                 elif qt == "specificity":
-                    verdict, evidence, issues = _eval_specificity(datasets, deg_datasets, mappings, tp.get("group", ""))
+                    verdict, evidence, issues = _eval_specificity(datasets, deg_datasets, mappings, tp.get("group", ""), reference=reference)
                 elif qt == "shared_vs_unique":
                     verdict, evidence, issues = _eval_shared_vs_unique(
                         datasets, deg_datasets, mappings,

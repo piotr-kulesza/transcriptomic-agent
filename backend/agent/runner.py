@@ -72,6 +72,7 @@ from ..agent.system_prompt import build_system_prompt
 from ..agent.seeder import generate_seeds, extract_evidence_stats
 from ..agent.coverage import build_coverage_grid, K_OFF_GRID, _MAX_AUTO_RAISE
 from ..agent.engine import characterize, build_layer1_summary
+from ..agent.orient import detect_reference_group, canonical_order
 from ..tools.registry import TOOLS, CROSS_TOOL_NAMES, DEG_TOOL_NAMES, summarize_result
 from ..tools.sandbox import execute_sandbox
 
@@ -222,6 +223,53 @@ _ENRICHMENT_FAMILIES: frozenset = frozenset({"enrichment"})
 _ORTHOGONAL_FAMILIES: frozenset = frozenset({
     "deg_replication", "fisher_meta", "network", "direction", "subgroup", "custom",
 })
+
+
+def _extract_orientation_signed(action: str, result: dict, params: dict = None) -> dict:
+    """
+    Return {"orientation": "X vs Y", "enriched_up": [...], "enriched_down": [...],
+            "genes_up": [...], "genes_down": [...]} for direction-consistency checks.
+
+    Pulls signed-statistic-direction lists from supported tool results. Missing fields
+    are returned as empty so the direction check simply finds nothing to compare against.
+    """
+    params = params or {}
+    out: dict = {"orientation": "", "enriched_up": [], "enriched_down": [], "genes_up": [], "genes_down": []}
+    if not isinstance(result, dict) or result.get("error"):
+        return out
+
+    orientation = result.get("orientation", "")
+    if not orientation:
+        gA, gB = params.get("groupA"), params.get("groupB")
+        if gA and gB:
+            orientation = f"{gA} vs {gB}"
+    out["orientation"] = orientation
+
+    if action in ("meta_gsea", "gsea_enrichment"):
+        out["enriched_up"]   = [r.get("pathway", "") for r in result.get("top_enriched_up",   [])]
+        out["enriched_down"] = [r.get("pathway", "") for r in result.get("top_enriched_down", [])]
+
+    elif action == "pathway_enrichment":
+        # ORA returns top_enriched without signed direction — skip for direction check
+        pass
+
+    elif action == "deg_voting":
+        out["genes_up"]   = [g.get("gene", "") for g in result.get("top_genes", []) if g.get("direction") == "UP"]
+        out["genes_down"] = [g.get("gene", "") for g in result.get("top_genes", []) if g.get("direction") == "DOWN"]
+
+    elif action == "deg_biomarker_ranking":
+        out["genes_up"]   = [g.get("gene", "") for g in result.get("top_biomarkers", []) if g.get("direction") == "UP"]
+        out["genes_down"] = [g.get("gene", "") for g in result.get("top_biomarkers", []) if g.get("direction") == "DOWN"]
+
+    elif action == "cross_dataset_de":
+        out["genes_up"]   = [g.get("gene", "") for g in result.get("top_consistent_up",   [])]
+        out["genes_down"] = [g.get("gene", "") for g in result.get("top_consistent_down", [])]
+
+    elif action == "differential_expression":
+        out["genes_up"]   = [g.get("gene", "") for g in result.get("top_upregulated",   [])]
+        out["genes_down"] = [g.get("gene", "") for g in result.get("top_downregulated", [])]
+
+    return out
 
 
 def _extract_evidence_meta(action: str, result: dict,
@@ -378,6 +426,66 @@ def _check_rejected_gate(hypothesis: dict) -> tuple:
     ]
 
 
+def _check_direction_consistency(hypothesis: dict, direction_claims: list) -> list[str]:
+    """
+    Verify each direction_claim against the signed statistics stored in evidence items.
+
+    Each claim: {"item": "PATHWAY_OR_GENE", "direction": "UP"|"DOWN", "in_group": "group"}
+    Evidence items carry "orientation" ("X vs Y"), "enriched_up"/"enriched_down" (pathways),
+    and "genes_up"/"genes_down" (genes).
+
+    Returns a list of human-readable mismatch descriptions (empty = all consistent).
+    """
+    issues: list[str] = []
+    for claim in direction_claims:
+        item = (claim.get("item") or "").strip().upper()
+        claimed_dir = (claim.get("direction") or "").strip().upper()
+        in_group = (claim.get("in_group") or "").strip()
+        if not item or claimed_dir not in ("UP", "DOWN") or not in_group:
+            continue
+
+        for ev in hypothesis.get("evidence", []):
+            orientation = ev.get("orientation", "")
+            if not orientation or " vs " not in orientation:
+                continue
+            parts = orientation.split(" vs ", 1)
+            groupA, groupB = parts[0].strip(), parts[1].strip()
+
+            if in_group.upper() == groupA.upper():
+                in_groupA = True
+            elif in_group.upper() == groupB.upper():
+                in_groupA = False
+            else:
+                continue  # this evidence item doesn't cover the target group
+
+            up_set   = {x.strip().upper() for x in ev.get("enriched_up",   ev.get("genes_up",   []))}
+            down_set = {x.strip().upper() for x in ev.get("enriched_down", ev.get("genes_down", []))}
+
+            if item in up_set:
+                # Item UP in groupA: UP in groupA, DOWN in groupB
+                actual_dir = "UP" if in_groupA else "DOWN"
+                if actual_dir != claimed_dir:
+                    issues.append(
+                        f"Direction mismatch for '{item}': claimed {claimed_dir} in {in_group}, "
+                        f"but signed statistic shows UP in {groupA} → "
+                        f"{'UP' if in_groupA else 'DOWN'} in {in_group} "
+                        f"(orientation: {groupA} vs {groupB}). "
+                        f"Correct: '{item}' is UP in {groupA}, DOWN in {groupB}."
+                    )
+            elif item in down_set:
+                # Item DOWN in groupA: DOWN in groupA, UP in groupB
+                actual_dir = "DOWN" if in_groupA else "UP"
+                if actual_dir != claimed_dir:
+                    issues.append(
+                        f"Direction mismatch for '{item}': claimed {claimed_dir} in {in_group}, "
+                        f"but signed statistic shows DOWN in {groupA} → "
+                        f"{'DOWN' if in_groupA else 'UP'} in {in_group} "
+                        f"(orientation: {groupA} vs {groupB}). "
+                        f"Correct: '{item}' is DOWN in {groupA}, UP in {groupB}."
+                    )
+    return issues
+
+
 def _jaccard(a: set, b: set) -> float:
     if not a or not b:
         return 0.0
@@ -418,10 +526,16 @@ async def run_agent_loop(
 
     # ── Pre-analysis seeding ──────────────────────────────────────────────────
     loop = asyncio.get_event_loop()
-    seeds, seed_summary, seed_data = await loop.run_in_executor(None, lambda: generate_seeds(datasets, mappings=mappings, deg_datasets=deg_datasets))
     _deg_only = len(datasets) == 0 and bool(deg_datasets)
+    # Detect canonical reference group once (most-common groupB across DEG tables)
+    _reference_group = detect_reference_group(deg_datasets, mappings)
+    if _reference_group:
+        logger.info("Canonical reference group detected: '%s'", _reference_group)
+    seeds, seed_summary, seed_data = await loop.run_in_executor(
+        None, lambda: generate_seeds(datasets, mappings=mappings, deg_datasets=deg_datasets, reference=_reference_group)
+    )
     # Build deterministic coverage grid (G1, G2, ...)
-    grid_hypotheses = build_coverage_grid(datasets, deg_datasets, mappings, _deg_only)
+    grid_hypotheses = build_coverage_grid(datasets, deg_datasets, mappings, _deg_only, reference=_reference_group)
     n_auto_gsea = sum(1 for s in seeds if s.get("seeded_by") == "auto_gsea")
     n_grid = len(grid_hypotheses)
     # Auto-raise budget: floor + grid + off-grid headroom, capped at _MAX_AUTO_RAISE
@@ -440,7 +554,7 @@ async def run_agent_loop(
         ), "summary": ""}
     yield {"type": "seed", "text": "Layer 1: running characterization engine (deterministic)…", "summary": ""}
     engine_results = await loop.run_in_executor(
-        None, lambda: characterize(datasets, deg_datasets, mappings, _deg_only, hypotheses)
+        None, lambda: characterize(datasets, deg_datasets, mappings, _deg_only, hypotheses, reference=_reference_group)
     )
     # Apply engine verdicts to hypothesis list
     for hyp in hypotheses:
@@ -473,6 +587,7 @@ async def run_agent_loop(
         seed_summary=seed_summary, deg_datasets=deg_datasets,
         max_hypotheses=max_hypotheses, k_off_grid=K_OFF_GRID,
         layer1_summary=layer1_summary,
+        reference_group=_reference_group,
     )
     if mappings:
         mapping_text = "\n".join(
@@ -913,6 +1028,7 @@ async def run_agent_loop(
             if h is not None:
                 # Attach structured evidence: dataset_ids is the set of underlying sources
                 ds_ids, best_fdr = _extract_evidence_meta(action, result or {}, params=params, deg_datasets=deg_datasets)
+                _orient = _extract_orientation_signed(action, result or {}, params=params)
                 ev_item = {
                     "step": step_num,
                     "action": action,
@@ -922,6 +1038,11 @@ async def run_agent_loop(
                     "best_fdr": best_fdr,
                     "reasoning": hypo_action.get("reasoning", ""),
                     "key_stats": extract_evidence_stats(action, result or {}, h.get("genes", [])),
+                    "orientation":   _orient["orientation"],
+                    "enriched_up":   _orient["enriched_up"],
+                    "enriched_down": _orient["enriched_down"],
+                    "genes_up":      _orient["genes_up"],
+                    "genes_down":    _orient["genes_down"],
                 }
                 h["evidence"].append(ev_item)
                 # Post-grid corroboration tracking
@@ -952,7 +1073,20 @@ async def run_agent_loop(
                     verdict = "uncertain"
                 if verdict == "confirmed":
                     ok, issues = _check_confirmed_gate(h)
-                    if not ok:
+                    if ok:
+                        # Direction-consistency check: any claimed direction must match signed stats
+                        dir_claims = hypo_action.get("direction_claims", []) or []
+                        dir_issues = _check_direction_consistency(h, dir_claims)
+                        if dir_issues:
+                            verdict = "uncertain"
+                            _eval_correction = (
+                                f"WARNING: {hid} verdict downgraded confirmed → uncertain due to "
+                                f"DIRECTION mismatch with signed statistics. "
+                                + " | ".join(dir_issues)
+                                + " Restate the direction correctly (UP/DOWN in the right group "
+                                + "under the canonical orientation) and re-evaluate."
+                            )
+                    else:
                         verdict = "uncertain"
                         _eval_correction = (
                             f"WARNING: {hid} verdict downgraded confirmed → uncertain. "

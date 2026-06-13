@@ -348,6 +348,7 @@ def meta_gsea(datasets: list, deg_datasets: dict = None,
 
     return {
         "comparison": f"{groupA} vs {groupB}",
+        "orientation": f"{groupA} vs {groupB}; NES>0 = higher in {groupA}",
         "n_datasets_pooled": n_datasets,
         "contributing_datasets": contributing_datasets,
         "n_genes_ranked": len(rnk),
@@ -356,7 +357,10 @@ def meta_gsea(datasets: list, deg_datasets: dict = None,
         "n_significant_fdr05": int((df_res["fdr"] < 0.05).sum()),
         "top_enriched_up": top_up,
         "top_enriched_down": top_down,
-        "interpretation": "; ".join(parts) if parts else "No significant enrichment at FDR<0.25",
+        "interpretation": (
+            f"[orientation: {groupA} vs {groupB}; NES>0 = higher in {groupA}] "
+            + ("; ".join(parts) if parts else "No significant enrichment at FDR<0.25")
+        ),
     }
 
 

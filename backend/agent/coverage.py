@@ -8,6 +8,7 @@ from __future__ import annotations
 import itertools
 
 from ..tools.cross import resolve_group
+from .orient import canonical_order
 
 # Off-grid budget: agent-proposed H-hypotheses allowed after grid is covered
 # Layer 2 explores until novelty exhausted (3 consecutive novel:false), up to this cap
@@ -41,6 +42,7 @@ def build_coverage_grid(
     mappings: dict,
     deg_only: bool,
     max_cells: int = _MAX_GRID_CELLS,
+    reference: str = None,
 ) -> list[dict]:
     """
     Return a deterministic, pruned, capped list of grid-cell hypothesis dicts.
@@ -146,8 +148,8 @@ def build_coverage_grid(
         if key in seen_svu:
             continue
         seen_svu.add(key)
-        a1, b1 = c1
-        a2, b2 = c2
+        a1, b1 = canonical_order(c1[0], c1[1], reference)
+        a2, b2 = canonical_order(c2[0], c2[1], reference)
         raw.append({
             "priority": 3,
             "sort_key": f"{a1}|{b1}|{a2}|{b2}",
@@ -183,14 +185,15 @@ def build_coverage_grid(
         n_total = n_deg + n_raw
         if n_total == 0:
             continue
+        ca, cb = canonical_order(a, b, reference)
         raw.append({
             "priority": 4,
             "sort_key": f"{a}|{b}",
             "question_type": "biomarker",
             "tool": "deg_biomarker_ranking",
-            "tool_params": {"groupA": a, "groupB": b},
+            "tool_params": {"groupA": ca, "groupB": cb},
             "text": (
-                f"A composite biomarker ranking for {a} vs {b} — weighting frequency, "
+                f"A composite biomarker ranking for {ca} vs {cb} — weighting frequency, "
                 f"direction consistency, effect size, and significance across "
                 f"{n_total} source(s) — identifies the most reproducible candidate markers."
             ),
@@ -203,14 +206,15 @@ def build_coverage_grid(
             n_deg = _deg_source_count(deg_datasets, a, b, mappings)
             if n_deg < 3:
                 continue
+            ha, hb = canonical_order(a, b, reference)
             raw.append({
                 "priority": 5,
                 "sort_key": f"{a}|{b}",
                 "question_type": "hub",
                 "tool": "deg_cooccurrence_network",
-                "tool_params": {"groupA": a, "groupB": b},
+                "tool_params": {"groupA": ha, "groupB": hb},
                 "text": (
-                    f"Co-occurrence hub genes in the {a} vs {b} DE network are the "
+                    f"Co-occurrence hub genes in the {ha} vs {hb} DE network are the "
                     f"most consistently co-DE nodes across {n_deg} source(s)."
                 ),
             })

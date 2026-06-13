@@ -1,4 +1,4 @@
-def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: str = "", deg_datasets: dict = None, max_hypotheses: int = 3, k_off_grid: int = 3, layer1_summary: str = "") -> str:
+def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: str = "", deg_datasets: dict = None, max_hypotheses: int = 3, k_off_grid: int = 3, layer1_summary: str = "", reference_group: str = None) -> str:
     ds_desc = "\n".join(
         f"  \u2022 {ds['name']}: {len(ds['expr'].index)} genes, {len(ds['expr'].columns)} samples, groups: [{', '.join(ds['groups'])}]"
         for ds in datasets
@@ -162,6 +162,8 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
             "4. DONE when off-grid novelty exhausted AND no H-hypotheses PENDING AND every UNCERTAIN attempted."
         )
 
+    reference_label = f"'{reference_group}'" if reference_group else "(none detected — alphabetical fallback)"
+
     return f"""You are a scientific agent working in Layer 2 mode: the deterministic Layer 1 engine has already evaluated all floor seeds and grid cells. Your role is synthesis + off-grid discovery — not re-running the grid.
 
 {layer1_summary}
@@ -211,6 +213,30 @@ including \u22651 orthogonal, \u22652 distinct datasets, FDR<0.05). Hold everyth
 Creativity belongs to proposing; rigour belongs to the verdict.
 Note: boldness means new angles, not re-wording. A proposal that merely restates an already-resolved
 axis is still flagged novel:false regardless of how it is phrased.
+
+CANONICAL ORIENTATION (CRITICAL \u2014 read before evaluating any direction claim):
+- Every group-pair comparison appears in ONE fixed orientation throughout the run.
+- Reference group (detected from DEG metadata): {reference_label}
+- Convention: comparisons are written as "X vs reference" (non-reference first).
+  Positive NES / logFC > 0 means HIGHER IN X. Negative means HIGHER IN THE REFERENCE.
+- Example: under orientation "OE vs Healthy", NES = -2.55 for COMPLEMENT means
+  complement is DOWN in OE relative to Healthy, i.e. complement is UP in Healthy, DOWN in OE.
+  Under orientation "Healthy vs OE", the same biological signal would have NES = +2.55.
+- Never flip the sign mentally without re-stating the orientation.
+- Tool outputs include an "orientation" field and an [orientation: X vs Y; NES>0 = higher in X]
+  tag in the interpretation string \u2014 read this BEFORE narrating direction.
+
+DIRECTION CLAIMS \u2014 required when verdict is "confirmed":
+- Whenever you mark a hypothesis CONFIRMED, attach direction_claims that the runner can verify
+  against the signed statistics in the evidence:
+  {{"type":"evaluate","hypothesis_id":"H1","verdict":"confirmed","reasoning":"...",
+   "direction_claims":[{{"item":"PATHWAY_OR_GENE","direction":"UP","in_group":"<group>"}}]}}
+- "item" is a pathway name or gene symbol present in evidence enriched_up/down or genes_up/down lists.
+  "direction" is UP or DOWN. "in_group" is the group where you claim the signal is elevated
+  (or depleted, for DOWN).
+- The runner checks each claim against the signed statistic under the canonical orientation
+  and blocks CONFIRMED if any claim contradicts the data (verdict \u2192 UNCERTAIN with a fix-up message).
+- Direction claims are OPTIONAL for verdicts other than confirmed.
 
 HYPOTHESIS ID CONTRACT \u2014 CRITICAL:
 - S1..Sn = seeder-generated from pre-analysis (floor seeds \u2014 pairwise comparison characterisation)
