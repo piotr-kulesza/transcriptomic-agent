@@ -145,6 +145,21 @@ def _write_report(datasets: list, seed_summary: str, seed_data: dict, steps: lis
     else:
         lines.append("_No common groups across datasets — no seed hypotheses._")
 
+    # PI Agenda — trajectory of next_action choices (proves AI-driven, not cell-marched)
+    _agenda_rows = [s for s in steps if s.get("next_action_choice") or s.get("next_action_rationale")]
+    if _agenda_rows:
+        lines.append("\n---\n## PI Agenda (next_action trajectory)\n")
+        lines.append("| Step | Choice | Action taken | Rationale |")
+        lines.append("|------|--------|--------------|-----------|")
+        for s in _agenda_rows:
+            choice = (s.get("next_action_choice") or "").replace("|", "\\|") or "—"
+            act = (s.get("action") or "").replace("|", "\\|") or "—"
+            rat = (s.get("next_action_rationale") or "").replace("|", "\\|").replace("\n", " ")
+            if len(rat) > 220:
+                rat = rat[:217] + "…"
+            lines.append(f"| {s['step']} | {choice} | `{act}` | {rat} |")
+        lines.append("")
+
     # Steps
     lines.append("\n---\n## Agent Steps\n")
     for s in steps:
@@ -1058,8 +1073,13 @@ async def run_agent_loop(
                     "reasoning": hypo_action.get("reasoning", ""),
                 }
 
-        # Collect step for report
+        # Collect step for report. Notebook (if present) captures the PI's chosen next_action.
         step_record: dict = {"step": step_num, "thought": thought, "action": action, "params": params}
+        if isinstance(_nb, dict):
+            _na = _nb.get("next_action") or {}
+            if isinstance(_na, dict):
+                step_record["next_action_choice"] = (_na.get("choice") or "").strip()
+                step_record["next_action_rationale"] = (_na.get("rationale") or "").strip()
         if action == "execute_code":
             step_record["code"] = params.get("code", "")
         if result is not None:
