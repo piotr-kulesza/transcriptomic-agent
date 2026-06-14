@@ -486,25 +486,6 @@ def _check_direction_consistency(hypothesis: dict, direction_claims: list) -> li
     return issues
 
 
-def _jaccard(a: set, b: set) -> float:
-    if not a or not b:
-        return 0.0
-    u = len(a | b)
-    return len(a & b) / u if u > 0 else 0.0
-
-
-def _is_novel(new_genes: list, resolved: list, threshold: float = 0.5) -> bool:
-    """True if new_genes is sufficiently distinct from every resolved hypothesis's gene set."""
-    new_set = {g.upper() for g in new_genes}
-    if not new_set:
-        return True
-    for h in resolved:
-        existing = {g.upper() for g in h.get("genes", [])}
-        if existing and _jaccard(new_set, existing) >= threshold:
-            return False
-    return True
-
-
 async def run_agent_loop(
     datasets: list,
     max_hypotheses: int,
@@ -605,10 +586,6 @@ async def run_agent_loop(
     total_cost_usd: float = 0.0         # accumulated API cost for this run
     post_grid_evidence: set = set()     # hypothesis IDs with ≥1 evidence added after grid covered
     pi_notebook: dict | None = None     # latest PI notebook from the AI (current_understanding / open_questions / next_action)
-    # Off-grid novelty tracking: reinstated for Layer 2 H-proposals
-    # Layer 2 explores until 3 consecutive H-proposals are novel:false → off_grid_exhausted
-    from collections import deque as _deque
-    off_grid_novelty_window: _deque = _deque(maxlen=3)
     _ONCE_ONLY = {"cross_dataset_de"}   # tools restricted to a single call per run
     _DEG_ONLY_ALLOWED = {"cross_dataset_de", "pathway_enrichment", "execute_code", "DONE"} | DEG_TOOL_NAMES
 
@@ -850,67 +827,43 @@ async def run_agent_loop(
             }
             hypotheses.append(h)
             yield {"type": "hypothesis_propose", "hypothesis": dict(h)}
-            # Track novelty for off-grid (H-prefix) proposals only — drives Layer 2 termination
-            agent_novel = bool(hypo_action.get("novel", True))
-            resolved_so_far = [x for x in hypotheses[:-1] if x["status"] != "pending"]
-            gene_set_novel = _is_novel(new_genes, resolved_so_far)
-            off_grid_novelty_window.append(agent_novel and gene_set_novel)
 
         loop = asyncio.get_event_loop()
 
         if action == "DONE":
-            evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
-            # floor+grid: all pre-evaluated by Layer 1 engine, so floor_done=True always
+            # Layer 1 evaluated all S+G up front, so floor_done is True from step 1.
+            # The PI (AI) decides when novelty is exhausted — the runner only enforces:
+            #   (1) no PENDING hypothesis, (2) every UNCERTAIN has had a corroboration attempt.
             floor_and_grid = [h for h in hypotheses if h.get("seeded_by") in ("auto_gsea", "grid")]
             floor_done = all(h["status"] != "pending" for h in floor_and_grid)
             no_pending = not any(h["status"] == "pending" for h in hypotheses)
             uncertain_at_done = {h["id"] for h in hypotheses if h["status"] == "uncertain"}
             all_corroborated = uncertain_at_done.issubset(post_grid_evidence)
-            # Off-grid novelty exhausted = 3 consecutive novel:false H-proposals
-            off_grid_exhausted = len(off_grid_novelty_window) >= 3 and not any(off_grid_novelty_window)
-            # DONE: floor+grid done, no pending, AND (budget met OR off-grid exhausted+corroborated)
-            can_done = is_last or (
-                floor_done and no_pending and (
-                    evaluated >= max_hypotheses or
-                    (off_grid_exhausted and all_corroborated)
-                )
-            )
+            can_done = is_last or (floor_done and no_pending and all_corroborated)
             if not can_done:
                 pending_all = [h["id"] for h in hypotheses if h["status"] == "pending"]
-                pending_grid = [h["id"] for h in hypotheses if h.get("seeded_by") == "grid" and h["status"] == "pending"]
                 logger.warning(
-                    "DONE blocked at step %d: floor_done=%s no_pending=%s off_grid_exhausted=%s "
-                    "all_corroborated=%s eval=%d/%d",
-                    step_num, floor_done, no_pending, off_grid_exhausted, all_corroborated,
-                    evaluated, max_hypotheses,
+                    "DONE blocked at step %d: floor_done=%s no_pending=%s all_corroborated=%s",
+                    step_num, floor_done, no_pending, all_corroborated,
                 )
                 if not floor_done:
-                    # Shouldn't happen after engine, but handle gracefully
                     pending_engine = [h["id"] for h in floor_and_grid if h["status"] == "pending"]
                     detail = (
                         f"Floor/grid cells still pending: {pending_engine}. "
-                        f"(These should have been pre-evaluated by Layer 1 — investigate.)"
+                        f"(Layer 1 should have evaluated these — investigate.)"
                     )
                 elif not no_pending:
                     detail = (
                         f"H-hypotheses still PENDING (never evaluated): {pending_all}. "
                         f"Gather evidence and evaluate each before calling DONE."
                     )
-                elif not all_corroborated:
+                else:
                     uncorroborated = sorted(uncertain_at_done - post_grid_evidence)
-                    remaining = max_hypotheses - evaluated
                     detail = (
                         f"Corroboration required for UNCERTAIN hypotheses: {uncorroborated}. "
-                        f"Gather at least one new evidence item for each — try an orthogonal method or "
-                        f"a second dataset. Hypothesis may stay UNCERTAIN; the attempt unblocks DONE. "
-                        f"({remaining} budget slots remain. Off-grid novelty window: {list(off_grid_novelty_window)}.)"
-                    )
-                else:
-                    remaining = max_hypotheses - evaluated
-                    detail = (
-                        f"Need {remaining} more evaluated H-hypotheses, or signal off-grid novelty "
-                        f"exhaustion: propose 3 consecutive H-hypotheses with novel:false. "
-                        f"(Current off-grid window: {list(off_grid_novelty_window)}.)"
+                        f"Gather at least one new evidence item for each (orthogonal method or "
+                        f"second dataset). The hypothesis may stay UNCERTAIN — the attempt itself "
+                        f"unblocks DONE."
                     )
                 report_steps.append({"step": step_num, "thought": thought, "action": "DONE", "params": {},
                                      "blocked": f"DONE blocked: {detail}"})

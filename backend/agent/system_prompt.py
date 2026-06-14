@@ -133,34 +133,24 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
             "Use when you need to compare groups that share a common comparator but lack a direct DEG table."
         )
 
-    if deg_only:
-        strategy = (
-            "STRATEGY (Layer 2 \u2014 DEG-only mode):\n"
-            "You are in Layer 2: all S and G hypotheses are already CONFIRMED or UNCERTAIN (see Layer 1 results above).\n"
-            "Your job: (1) synthesise the Layer 1 picture; (2) propose off-grid H-hypotheses for signals "
-            "not covered by any grid cell; (3) corroborate UNCERTAIN hypotheses.\n"
-            "1. SYNTHESISE: in your first thought, describe which axes are confirmed, which are uncertain, "
-            "and what patterns (shared axes, gradient ordering, specificity) emerge from Layer 1.\n"
-            "2. PROPOSE: off-grid H-hypotheses for genuinely new questions the grid did not cover "
-            "\u2014 cross-cutting mechanistic links, interaction effects, outlier groups, gradient deviations, "
-            "context-specific signals. Use the full tool set. Explore until novelty is exhausted "
-            "(novel:false when you have no more new ideas relative to the full Layer 1 picture).\n"
-            "3. CORROBORATE: for each UNCERTAIN S or G hypothesis, attempt at least one additional "
-            "orthogonal method or second dataset. If still UNCERTAIN, that is a valid result \u2014 document it.\n"
-            "4. DONE when off-grid novelty exhausted AND no H-hypotheses PENDING AND "
-            "every UNCERTAIN hypothesis has had a corroboration attempt."
-        )
-    else:
-        strategy = (
-            "STRATEGY (Layer 2 \u2014 raw expression mode):\n"
-            "You are in Layer 2: all S and G hypotheses are already CONFIRMED or UNCERTAIN (see Layer 1 results above).\n"
-            "Your job: (1) synthesise the Layer 1 picture; (2) propose off-grid H-hypotheses; (3) corroborate UNCERTAIN.\n"
-            "1. SYNTHESISE: describe confirmed axes, uncertain ones, and emergent patterns from Layer 1.\n"
-            "2. PROPOSE: off-grid hypotheses \u2014 mechanistic links, interaction effects, subgroup deviations, "
-            "rewiring. Use cross_dataset_de / invariant_axis / subgroup_discovery / gene_network_hub / execute_code.\n"
-            "3. CORROBORATE: for UNCERTAIN S or G hypotheses, gather a second orthogonal method.\n"
-            "4. DONE when off-grid novelty exhausted AND no H-hypotheses PENDING AND every UNCERTAIN attempted."
-        )
+    _strategy_body = (
+        "STRATEGY \u2014 you are the Principal Investigator. Layer 1 has already evaluated every S- and "
+        "G-hypothesis (verdicts + evidence in the LAYER 1 SUMMARY above).\n"
+        "1. SYNTHESISE: in your first notebook entry, describe what Layer 1 establishes \u2014 confirmed "
+        "axes, uncertain ones, emergent cross-cutting patterns. This is your starting "
+        "current_understanding.\n"
+        "2. AGENDA: populate open_questions with the most valuable above-floor questions you can ask "
+        "\u2014 mechanistic links between confirmed findings, interaction effects, outlier groups, "
+        "gradient deviations, subgroup structure, context-specific signals. Each must have a one-line "
+        "why. Reorder/edit this list as evidence accumulates.\n"
+        "3. ACT: each step pick one open_question and execute it \u2014 propose an H-hypothesis and gather "
+        "evidence with a tool of your choice, or corroborate an UNCERTAIN S/G/H finding by adding an "
+        "orthogonal method or second-dataset replication.\n"
+        "4. STOP: when no question in open_questions is worth pursuing, empty the list, set "
+        "next_action.choice=finalize, and call DONE. The runner enforces no-pending + "
+        "all-uncertain-corroborated; the judgement that nothing more is worth asking is yours."
+    )
+    strategy = _strategy_body
 
     reference_label = f"'{reference_group}'" if reference_group else "(none detected — alphabetical fallback)"
 
