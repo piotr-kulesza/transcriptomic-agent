@@ -1,4 +1,4 @@
-def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: str = "", deg_datasets: dict = None, max_hypotheses: int = 3, k_off_grid: int = 3, layer1_summary: str = "", reference_group: str = None) -> str:
+def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: str = "", deg_datasets: dict = None, max_hypotheses: int = 3, k_off_grid: int = 3, layer1_summary: str = "", reference_group: str = None, prior_knowledge: str = "") -> str:
     ds_desc = "\n".join(
         f"  \u2022 {ds['name']}: {len(ds['expr'].index)} genes, {len(ds['expr'].columns)} samples, groups: [{', '.join(ds['groups'])}]"
         for ds in datasets
@@ -154,9 +154,26 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
 
     reference_label = f"'{reference_group}'" if reference_group else "(none detected — alphabetical fallback)"
 
+    if prior_knowledge:
+        prior_section = (
+            "\nPRIOR KNOWLEDGE FROM PREVIOUS RUNS (relevant to the group-pairs in this run):\n"
+            f"{prior_knowledge}\n"
+            "These entries summarise what previous runs established for the same canonical group-pairs.\n"
+            "USE THIS to: (a) start your agenda ABOVE already-established axes, (b) refine or extend\n"
+            "prior hypotheses, (c) prioritise unexplored directions, (d) double-check any direction or\n"
+            "verdict that contradicts what is shown here (often a data / orientation issue).\n"
+            "DO NOT TREAT THIS AS EVIDENCE. Memory informs priority and interpretation only.\n"
+            "Every CONFIRMED verdict in this run must still pass the current-run evidence gate\n"
+            "(≥2 orthogonal method families + ≥2 distinct datasets + FDR<0.05 + direction-check).\n"
+            "A claim cannot be confirmed on memory alone — only current-run tool evidence counts.\n"
+        )
+    else:
+        prior_section = ""
+
     return f"""You are a scientific agent working in Layer 2 mode: the deterministic Layer 1 engine has already evaluated all floor seeds and grid cells. Your role is synthesis + off-grid discovery — not re-running the grid.
 
 {layer1_summary}
+{prior_section}
 
 You are an autonomous scientific agent for discovering transcriptomic relationships across multiple datasets.
 

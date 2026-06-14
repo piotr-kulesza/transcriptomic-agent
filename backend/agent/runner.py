@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
@@ -73,17 +75,25 @@ from ..agent.seeder import generate_seeds, extract_evidence_stats
 from ..agent.coverage import build_coverage_grid, K_OFF_GRID, _MAX_AUTO_RAISE
 from ..agent.engine import characterize, build_layer1_summary
 from ..agent.orient import detect_reference_group, canonical_order
+from ..agent.memory import (
+    load_knowledge, save_knowledge, relevant_entries, format_prior_knowledge_block,
+    extract_claims_from_hypotheses, merge_claims, canonical_pairs_from_datasets,
+    KNOWLEDGE_PATH,
+)
 from ..tools.registry import TOOLS, CROSS_TOOL_NAMES, DEG_TOOL_NAMES, summarize_result
 from ..tools.sandbox import execute_sandbox
 
 REPORTS_DIR = "reports"
 
 
-def _write_report(datasets: list, seed_summary: str, seed_data: dict, steps: list, hypotheses: list, done_text: str) -> str:
+def _write_report(
+    datasets: list, seed_summary: str, seed_data: dict, steps: list, hypotheses: list, done_text: str,
+    prior_entries: list[dict] | None = None, contradictions: list[dict] | None = None,
+) -> str:
     """Write a Markdown report of the agent run. Returns the file path."""
     os.makedirs(REPORTS_DIR, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    ds_names = "_".join(ds["name"].replace(" ", "-") for ds in datasets)
+    ds_names = "_".join(ds["name"].replace(" ", "-") for ds in datasets) or "no-raw-datasets"
     path = os.path.join(REPORTS_DIR, f"run_{ts}_{ds_names}.md")
 
     lines = []
@@ -92,6 +102,36 @@ def _write_report(datasets: list, seed_summary: str, seed_data: dict, steps: lis
     lines.append(f"**Datasets:** {', '.join(ds['name'] for ds in datasets)}  ")
     for ds in datasets:
         lines.append(f"- {ds['name']}: {len(ds['expr'].index)} genes, {len(ds['expr'].columns)} samples, groups: {', '.join(ds['groups'])}")
+
+    # Cross-run inconsistencies (direction or status flips relative to stored knowledge)
+    if contradictions:
+        lines.append("\n---\n## ⚠ Cross-Run Inconsistencies\n")
+        lines.append(
+            "The following findings disagree with what previous runs established for the same "
+            "canonical group-pair + item. Often this signals a data, orientation, or canonicalisation "
+            "issue — investigate before treating either side as ground truth.\n"
+        )
+        lines.append("| Pair | Item | Stored direction (verdict, support) | This run (direction, verdict) |")
+        lines.append("|------|------|-------------------------------------|-------------------------------|")
+        for c in contradictions:
+            lines.append(
+                f"| {c.get('pair','')} | {c.get('item','')} | "
+                f"{c.get('stored_direction','')} in {c.get('stored_in_group','')} "
+                f"({(c.get('stored_verdict') or '').upper()}, support={c.get('support_count',0)}) | "
+                f"{c.get('new_direction','')} in {c.get('new_in_group','')} "
+                f"({(c.get('new_verdict') or '').upper()}) |"
+            )
+        lines.append("")
+
+    # Prior knowledge loaded into this run (PI started from this baseline)
+    if prior_entries:
+        lines.append("\n---\n## Prior Knowledge Loaded\n")
+        lines.append(
+            f"{len(prior_entries)} entries from previous runs were surfaced to the PI at run start "
+            "(memory informs priority and interpretation; current-run evidence is still required to confirm).\n"
+        )
+        from .memory import format_prior_knowledge_block as _fpkb
+        lines.append("```\n" + _fpkb(prior_entries) + "\n```")
 
     # Pre-analysis
     lines.append("\n---\n## Pre-analysis\n")
@@ -527,6 +567,19 @@ async def run_agent_loop(
     _reference_group = detect_reference_group(deg_datasets, mappings)
     if _reference_group:
         logger.info("Canonical reference group detected: '%s'", _reference_group)
+
+    # ── Cross-run memory: load prior knowledge relevant to this run's pairs ──
+    knowledge_store = await loop.run_in_executor(None, load_knowledge, KNOWLEDGE_PATH)
+    current_pairs = canonical_pairs_from_datasets(datasets, deg_datasets, mappings, _reference_group)
+    prior_entries = relevant_entries(knowledge_store, current_pairs)
+    prior_knowledge_text = format_prior_knowledge_block(prior_entries)
+    if prior_entries:
+        logger.info(
+            "Loaded %d prior-knowledge entries relevant to current pairs (of %d total in store)",
+            len(prior_entries), len(knowledge_store.get("entries", [])),
+        )
+    # Run identity (used later when persisting claims and contradictions)
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     seeds, seed_summary, seed_data = await loop.run_in_executor(
         None, lambda: generate_seeds(datasets, mappings=mappings, deg_datasets=deg_datasets, reference=_reference_group)
     )
@@ -584,6 +637,7 @@ async def run_agent_loop(
         max_hypotheses=max_hypotheses, k_off_grid=K_OFF_GRID,
         layer1_summary=layer1_summary,
         reference_group=_reference_group,
+        prior_knowledge=prior_knowledge_text,
     )
     if mappings:
         mapping_text = "\n".join(
@@ -601,6 +655,7 @@ async def run_agent_loop(
     total_cost_usd: float = 0.0         # accumulated API cost for this run
     post_grid_evidence: set = set()     # hypothesis IDs with ≥1 evidence added after grid covered
     pi_notebook: dict | None = None     # latest PI notebook from the AI (current_understanding / open_questions / next_action)
+    direction_claims_by_hid: dict[str, list[dict]] = {}  # captured per evaluate for cross-run memory
     _ONCE_ONLY = {"cross_dataset_de"}   # tools restricted to a single call per run
     _DEG_ONLY_ALLOWED = {"cross_dataset_de", "pathway_enrichment", "execute_code", "DONE"} | DEG_TOOL_NAMES
 
@@ -886,8 +941,22 @@ async def run_agent_loop(
                 messages.append({"role": "user", "content": f"ERROR: Cannot call DONE yet. {detail}"})
                 continue
             yield {"type": "done", "text": thought}
+            # Persist to cross-run knowledge store and collect any direction-flip contradictions
+            run_meta = {
+                "run_id": run_id,
+                "datasets": [ds["name"] for ds in datasets] + sorted(deg_datasets.keys()),
+                "groups": sorted({g for ds in datasets for g in ds.get("groups", [])}),
+                "model": "claude-opus-4-8",
+            }
+            new_claims = extract_claims_from_hypotheses(hypotheses, direction_claims_by_hid)
+            updated_store, contradictions = merge_claims(knowledge_store, new_claims, run_meta)
+            try:
+                await loop.run_in_executor(None, save_knowledge, updated_store, KNOWLEDGE_PATH)
+            except Exception as e:
+                logger.error("Failed to persist knowledge store: %s", e)
             report_path = await loop.run_in_executor(
-                None, _write_report, datasets, seed_summary, seed_data, report_steps, hypotheses, thought
+                None, _write_report, datasets, seed_summary, seed_data, report_steps, hypotheses, thought,
+                prior_entries, contradictions,
             )
             yield {"type": "report", "path": report_path}
             return
@@ -1031,6 +1100,11 @@ async def run_agent_loop(
                         ),
                     }
 
+                # Capture direction_claims for cross-run memory (used at run end).
+                _raw_dc = hypo_action.get("direction_claims") or []
+                if isinstance(_raw_dc, list) and _raw_dc:
+                    direction_claims_by_hid[h["id"]] = _raw_dc
+
                 # Gate the verdict
                 verdict = hypo_action.get("verdict", "uncertain")
                 if verdict not in ("confirmed", "rejected", "uncertain"):
@@ -1110,7 +1184,20 @@ async def run_agent_loop(
     evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
     done_text = f"Safety step limit reached ({max_steps} steps). {evaluated}/{max_hypotheses} hypotheses evaluated."
     yield {"type": "done", "text": done_text, "exhausted": True}
+    run_meta = {
+        "run_id": run_id,
+        "datasets": [ds["name"] for ds in datasets] + sorted(deg_datasets.keys()),
+        "groups": sorted({g for ds in datasets for g in ds.get("groups", [])}),
+        "model": "claude-opus-4-8",
+    }
+    new_claims = extract_claims_from_hypotheses(hypotheses, direction_claims_by_hid)
+    updated_store, contradictions = merge_claims(knowledge_store, new_claims, run_meta)
+    try:
+        await loop.run_in_executor(None, save_knowledge, updated_store, KNOWLEDGE_PATH)
+    except Exception as e:
+        logger.error("Failed to persist knowledge store: %s", e)
     report_path = await loop.run_in_executor(
-        None, _write_report, datasets, seed_summary, seed_data, report_steps, hypotheses, done_text
+        None, _write_report, datasets, seed_summary, seed_data, report_steps, hypotheses, done_text,
+        prior_entries, contradictions,
     )
     yield {"type": "report", "path": report_path}

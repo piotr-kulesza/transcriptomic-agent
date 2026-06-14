@@ -77,10 +77,24 @@ Group name equivalences across datasets (e.g. `"normal"` = `["Endometrium-Normal
 ### Reports
 
 Completed runs write a Markdown report to `reports/run_<timestamp>_<dataset>.md` containing:
+- Cross-run inconsistencies (when the current run's direction disagrees with stored knowledge)
+- Prior knowledge loaded (entries surfaced to the PI at run start)
 - Pre-analysis tables (per-dataset MWU DE results + cross-dataset DE)
+- PI Agenda (per-step next_action.choice + rationale)
 - All agent steps with thoughts, actions, results
 - All hypotheses (S1..Sn seeds + H1..Hn agent-proposed) with evidence
 - Final conclusion (agent's DONE summary or budget-exhausted warning)
+
+### Cross-run memory (`memory/knowledge.json`)
+
+At run end the runner merges every resolved hypothesis's direction claims into
+`memory/knowledge.json`, keyed by `(canonical_pair, item)`. Entries store verdict,
+evidence summary, provenance, and per-key `support_count` / `contradiction_count`.
+At the next run's start, entries whose canonical pair appears in the current
+datasets are loaded and rendered in the system prompt as PRIOR KNOWLEDGE — the PI
+uses them to prioritise above-baseline directions, not as evidence. Every CONFIRMED
+verdict in the current run must still pass the evidence gate (`backend/agent/memory.py`).
+Direction-flip contradictions across runs are surfaced at the top of the report.
 
 ## Running locally
 
