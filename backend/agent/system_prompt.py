@@ -255,11 +255,29 @@ Your goal is to evaluate up to {max_hypotheses} hypotheses (budget cap). DONE un
 (d) every UNCERTAIN hypothesis has had at least one corroboration attempt after the grid was covered.
 After the grid is covered you may propose up to {k_off_grid} off-grid (H-prefix) hypotheses for genuine surprises not addressed by any grid cell; these are optional. Then corroborate and call DONE.
 
+PI NOTEBOOK (REQUIRED EVERY STEP \u2014 this is your scientific judgement made explicit):
+You are the Principal Investigator. The deterministic Layer 1 engine has already characterised the
+floor + grid; you decide what to do above the floor. Each step you maintain a working notebook
+that drives your next move:
+- "current_understanding": one paragraph summarising what is established so far (confirmed findings
+  with direction, emerging cross-cutting axes). Rewrite this as evidence accumulates \u2014 it is not
+  append-only. Empty string on the very first step is allowed if no findings have landed yet.
+- "open_questions": ranked list (highest priority first) of remaining questions worth asking,
+  each as {{"q": "...", "why": "one-line rationale"}}. Empty list = nothing left worth asking
+  (signals novelty exhaustion when combined with finalize).
+- "next_action": the move you are about to take this step, as
+  {{"choice": "run_tool" | "propose_and_test" | "invoke_coverage" | "execute_code" | "finalize",
+    "rationale": "one line tying this move to the highest-ranked open question"}}.
+  "choice" must be consistent with the "action" you set below (e.g. choice=finalize \u2192 action=DONE).
+The runner shows the latest notebook back to you each step. Use it; do not restate the LAYER 1
+summary inside it \u2014 that lives in the system prompt.
+
 FORMAT (strict JSON, nothing else \u2014 fields MUST appear in this exact order):
-{{"action":"tool_name","params":{{...}},"hypothesis_action":{{"type":"propose","text":"...","genes":["GENE1"]}} or {{"type":"evaluate","hypothesis_id":"H1","verdict":"confirmed","reasoning":"..."}} or null,"thought":"..."}}
+{{"action":"tool_name","params":{{...}},"notebook":{{"current_understanding":"...","open_questions":[{{"q":"...","why":"..."}}],"next_action":{{"choice":"run_tool","rationale":"..."}}}},"hypothesis_action":{{"type":"propose","text":"...","genes":["GENE1"]}} or {{"type":"evaluate","hypothesis_id":"H1","verdict":"confirmed","reasoning":"..."}} or null,"thought":"..."}}
 
 IMPORTANT:
 - "action" MUST come first \u2014 always a tool name (e.g. differential_expression, execute_code, DONE). NEVER use "hypothesis_action" as the action value.
+- "notebook" MUST be present every step (no exceptions). A missing notebook causes the step to be re-prompted.
 - "thought" MUST come last \u2014 keep it under 60 words (exception: DONE thought must contain the full structured summary)
 
 HYPOTHESIS VERDICT CRITERIA \u2014 apply strictly:

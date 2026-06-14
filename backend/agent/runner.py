@@ -604,6 +604,7 @@ async def run_agent_loop(
     once_only_called: set = set()       # tools that may only be called once per run
     total_cost_usd: float = 0.0         # accumulated API cost for this run
     post_grid_evidence: set = set()     # hypothesis IDs with ≥1 evidence added after grid covered
+    pi_notebook: dict | None = None     # latest PI notebook from the AI (current_understanding / open_questions / next_action)
     # Off-grid novelty tracking: reinstated for Layer 2 H-proposals
     # Layer 2 explores until 3 consecutive H-proposals are novel:false → off_grid_exhausted
     from collections import deque as _deque
@@ -614,6 +615,39 @@ async def run_agent_loop(
     for i in range(max_steps):
         step_num = i + 1
         is_last = step_num == max_steps
+
+        # ── PI notebook block (the AI's own working state, rendered back each step) ──
+        if pi_notebook is None:
+            notebook_block = (
+                "PI NOTEBOOK (your working state — empty, this is your first step):\n"
+                "  current_understanding: (none yet — draft after reading the Layer 1 summary)\n"
+                "  open_questions: (none yet)\n"
+                "  next_action: (none yet — declare it in this step)\n"
+            )
+        else:
+            _cu = (pi_notebook.get("current_understanding") or "").strip() or "(empty)"
+            _oq = pi_notebook.get("open_questions") or []
+            if isinstance(_oq, list) and _oq:
+                _oq_lines = []
+                for i, item in enumerate(_oq[:8], 1):
+                    if isinstance(item, dict):
+                        q = (item.get("q") or "").strip()
+                        why = (item.get("why") or "").strip()
+                        _oq_lines.append(f"    {i}. {q} — why: {why}")
+                    else:
+                        _oq_lines.append(f"    {i}. {str(item)[:160]}")
+                _oq_str = "\n".join(_oq_lines)
+            else:
+                _oq_str = "    (none — if this persists, you may finalize)"
+            _na = pi_notebook.get("next_action") or {}
+            _choice = (_na.get("choice") if isinstance(_na, dict) else None) or "(unspecified)"
+            _rat = (_na.get("rationale") if isinstance(_na, dict) else "") or ""
+            notebook_block = (
+                "PI NOTEBOOK (your last working state — REWRITE it this step):\n"
+                f"  current_understanding: {_cu}\n"
+                f"  open_questions:\n{_oq_str}\n"
+                f"  last next_action: choice={_choice}; rationale={_rat}\n"
+            )
 
         discovery_summary = (
             "Discoveries:\n" + "\n".join(f"- [{d['action']}] {d['summary']}" for d in discoveries[-8:])
@@ -645,7 +679,7 @@ async def run_agent_loop(
             if hypo_lines else ""
         )
 
-        summary_block = f"{discovery_summary}{hypo_summary}"
+        summary_block = f"{notebook_block}\n{discovery_summary}{hypo_summary}"
         evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
         # Grid coverage: all G-hypotheses evaluated (empty grid → True)
         _gc = not any(h["status"] == "pending" for h in hypotheses if h.get("seeded_by") == "grid")
@@ -809,6 +843,10 @@ async def run_agent_loop(
         action = dec.get("action", "")
         params = dec.get("params", {})
         hypo_action = dec.get("hypothesis_action")
+        # Persist PI notebook if the AI wrote one this step. The notebook drives next-step rendering.
+        _nb = dec.get("notebook")
+        if isinstance(_nb, dict):
+            pi_notebook = _nb
 
         # Guard: reject tools that may only be called once per run
         if action in _ONCE_ONLY and action in once_only_called:
