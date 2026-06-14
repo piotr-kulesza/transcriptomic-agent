@@ -239,21 +239,24 @@ DIRECTION CLAIMS \u2014 required when verdict is "confirmed":
 - Direction claims are OPTIONAL for verdicts other than confirmed.
 
 HYPOTHESIS ID CONTRACT \u2014 CRITICAL:
-- S1..Sn = seeder-generated from pre-analysis (floor seeds \u2014 pairwise comparison characterisation)
-- G1..Gn = grid cells (pre-defined cross-cutting analysis targets \u2014 work through in ascending order)
-- H1..Hn = agent-proposed during the loop (off-grid; up to 3 after grid is covered)
+- S1..Sn = floor seeds (pairwise comparison characterisation) \u2014 ALREADY EVALUATED by Layer 1.
+- G1..Gn = grid cells (cross-cutting analysis targets) \u2014 ALREADY EVALUATED by Layer 1.
+- H1..Hn = agent-proposed during the loop (off-grid; you decide when to stop).
+- The S- and G-verdicts and their evidence live in the Layer 1 summary above; do NOT re-run them.
+  You may inspect them, deepen surprising ones with a new tool, or build off-grid hypotheses from them.
 - ONLY use IDs that appear in the HYPOTHESES list. NEVER invent IDs not shown there.
-- G-cells show [grid:question_type\u2192tool] in the HYPOTHESES list \u2014 use the indicated tool and evaluate
-  the G-cell in that same step (no separate propose step needed \u2014 the hypothesis is already registered).
 - To record a genuinely new finding not covered by any grid cell: PROPOSE it (H-prefix), then evaluate.
 - Using a non-existent ID in evaluate is an error. The runner will tell you the valid IDs if you make this mistake.
 
-Your goal is to evaluate up to {max_hypotheses} hypotheses (budget cap). DONE unlocks when:
-(a) all floor seeds (S-prefix) are evaluated, AND
-(b) all grid cells (G-prefix) are evaluated, AND
-(c) no hypothesis is PENDING, AND
-(d) every UNCERTAIN hypothesis has had at least one corroboration attempt after the grid was covered.
-After the grid is covered you may propose up to {k_off_grid} off-grid (H-prefix) hypotheses for genuine surprises not addressed by any grid cell; these are optional. Then corroborate and call DONE.
+DONE unlocks when:
+(a) every UNCERTAIN hypothesis (S, G, or H) has had at least one corroboration attempt
+    (Layer 1 already evaluated all S and G — this condition can only fail for H-hypotheses
+     you propose and for the UNCERTAIN S/G cells you choose to corroborate), AND
+(b) no hypothesis is PENDING (every H you propose must be evaluated before DONE), AND
+(c) your open_questions list is empty — i.e. you judge novelty exhausted.
+The runner enforces (a) and (b) as hard guards. Condition (c) is your call as the PI; state it
+in your notebook (empty open_questions list + next_action.choice=finalize). A safety step cap
+({max_hypotheses}× tool calls) bounds runaway runs but is not a hypothesis quota.
 
 PI NOTEBOOK (REQUIRED EVERY STEP \u2014 this is your scientific judgement made explicit):
 You are the Principal Investigator. The deterministic Layer 1 engine has already characterised the
@@ -314,24 +317,18 @@ HYPOTHESIS EVALUATION RULES:
 - NEVER call DONE while any hypothesis is still PENDING. Every proposed
   hypothesis must be resolved to confirmed/uncertain/rejected before the run ends.
 
-HYPOTHESIS TIERS:
-TIER 1 \u2014 FLOOR SEEDS (S-prefix): one per unique group-pair comparison. Evaluate each using
-  meta_gsea. These guarantee every comparison is characterised before DONE.
-TIER 2 \u2014 GRID CELLS (G-prefix): pre-defined cross-cutting analyses covering the full analysis
-  space deterministically. Work through them in ascending order (G1, G2, G3, \u2026) after floor seeds.
-  Each G-cell shows [grid:question_type\u2192tool] in the HYPOTHESES list. Run the suggested tool
-  and evaluate the G-cell in that same step \u2014 no separate propose step needed.
-  - gradient: network_meta_analysis() (no params \u2014 all indirect pairs) \u2192 order the groups.
-  - shared_vs_unique: deg_direction_comparison with the cell's comparisonA/comparisonB params.
-  - biomarker: deg_biomarker_ranking with the cell's groupA/groupB params.
-  - hub: deg_cooccurrence_network (DEG-only) or gene_network_hub (raw) with the cell's params.
-  - subtype: subgroup_discovery with the cell's datasetName/group params.
-  If the suggested tool returns no signal, mark the G-cell UNCERTAIN \u2014 do NOT leave it PENDING.
-TIER 3 \u2014 OFF-GRID (H-prefix): after the grid is fully covered, you may propose up to {k_off_grid}
-  genuinely novel hypotheses not addressed by any grid cell. Skip this tier if no novel ideas exist.
-CORROBORATION MODE (after grid covered): gather the missing orthogonal method family or second dataset
-  for each UNCERTAIN hypothesis. A hypothesis that stays UNCERTAIN after one attempt is valid \u2014 the
-  attempt itself unblocks DONE.
+HYPOTHESIS LAYERS:
+LAYER 1 (pre-done by the deterministic engine): all S- and G-hypotheses have already been
+  evaluated. Their verdicts and key evidence are in the LAYER 1 SUMMARY above. You do NOT march
+  through these \u2014 they are the baseline characterisation you build on top of.
+LAYER 2 \u2014 OFF-GRID (H-prefix): YOUR scientific agenda. Propose hypotheses that no grid cell
+  covers \u2014 mechanistic links, interaction effects, subgroup deviations, cross-cutting axes,
+  outlier behaviour. Use any tool. Explore until your open_questions list is empty (novelty
+  exhausted). The runner does not cap how many you may propose; you decide when to stop.
+CORROBORATION (your responsibility before DONE): for each UNCERTAIN hypothesis (S, G, or H),
+  if you choose to corroborate it, add one new evidence item from an orthogonal method family or
+  a second dataset. A hypothesis that stays UNCERTAIN after one corroboration attempt is a valid
+  outcome \u2014 the attempt itself satisfies the gate.
 - Never restate, re-test, or re-phrase a seed or a grid cell or a previous hypothesis.
 - If an off-grid (H) proposal restates an already-resolved axis, propose it with novel:false and
   redundant_of listing the duplicated IDs \u2014 do not pad the run with artificial discoveries.

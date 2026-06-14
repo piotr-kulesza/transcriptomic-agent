@@ -681,87 +681,45 @@ async def run_agent_loop(
 
         summary_block = f"{notebook_block}\n{discovery_summary}{hypo_summary}"
         evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
-        # Grid coverage: all G-hypotheses evaluated (empty grid → True)
-        _gc = not any(h["status"] == "pending" for h in hypotheses if h.get("seeded_by") == "grid")
         _no_pending = not any(h["status"] == "pending" for h in hypotheses)
         _uncertain_now = {h["id"] for h in hypotheses if h["status"] == "uncertain"}
         _all_corroborated = _uncertain_now.issubset(post_grid_evidence)
-        _next_grid = next(
-            (h for h in hypotheses if h.get("seeded_by") == "grid" and h["status"] == "pending"),
-            None,
-        )
-        _floor_seeds_done = not any(
-            h["status"] == "pending"
-            for h in hypotheses if h.get("seeded_by") == "auto_gsea"
-        )
 
+        # ── Factual ledger — no cell-march, no directives. The AI is the PI. ──
+        _pending_ids = [h["id"] for h in hypotheses if h["status"] == "pending"]
+        _uncorroborated = sorted(_uncertain_now - post_grid_evidence)
+        _off_grid_n = sum(1 for h in hypotheses if h.get("seeded_by") == "llm")
+        ledger_lines = [
+            f"Layer 1: {n_grid}/{n_grid} grid cells + {n_auto_gsea} floor seeds pre-evaluated. "
+            f"Off-grid H-proposals so far: {_off_grid_n}."
+        ]
+        if _pending_ids:
+            ledger_lines.append(f"PENDING (must resolve before DONE): {_pending_ids}.")
+        if _uncorroborated:
+            ledger_lines.append(
+                f"UNCERTAIN needing corroboration before DONE: {_uncorroborated} — "
+                f"one new evidence item suffices (orthogonal method or second dataset)."
+            )
         if is_last:
-            user_content = (
-                f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\n"
-                "FINAL STEP — safety limit reached. Evaluate any remaining hypotheses as uncertain and call DONE."
+            gate_state = (
+                "FINAL STEP — safety step limit reached. Resolve any pendings as uncertain "
+                "if needed and call DONE."
             )
-        elif _no_pending and (_gc and _all_corroborated or evaluated >= max_hypotheses):
-            user_content = (
-                f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated — TARGET REACHED]. {summary_block}\n\n"
-                "You have evaluated all required hypotheses. Write a comprehensive final summary as the thought field — "
-                "cover each hypothesis verdict with key evidence and statistics, the most important genes and their expression patterns, "
-                "key pathways and mechanisms identified, and an overall biological conclusion. Then call DONE."
-            )
-        elif _gc:
-            # Grid covered — corroboration mode (off-grid H-proposals still allowed)
-            _off_grid_n = sum(1 for h in hypotheses if h.get("seeded_by") == "llm")
-            _off_grid_rem = max(0, K_OFF_GRID - _off_grid_n)
-            _pending_ids = [h["id"] for h in hypotheses if h["status"] == "pending"]
-            _uncorroborated = sorted(_uncertain_now - post_grid_evidence)
-            _msg_parts = [f"GRID COVERED ({n_grid}/{n_grid} cells done). Corroboration mode."]
-            if _off_grid_rem > 0 and not _pending_ids:
-                _msg_parts.append(
-                    f"Off-grid budget: {_off_grid_n}/{K_OFF_GRID} proposals used; "
-                    f"you may propose up to {_off_grid_rem} more genuinely novel hypotheses "
-                    f"not covered by any grid cell."
-                )
-            if _pending_ids:
-                _msg_parts.append(
-                    f"Pending hypotheses (never evaluated): {_pending_ids}. "
-                    "Gather evidence and evaluate each to confirmed/uncertain/rejected."
-                )
-            if _uncorroborated:
-                _msg_parts.append(
-                    f"Uncertain hypotheses needing corroboration: {_uncorroborated}. "
-                    "For each: add the missing orthogonal method family or a second dataset replication. "
-                    "If genuinely impossible to upgrade, make one attempt — "
-                    "the attempt itself unblocks DONE even if the verdict stays uncertain."
-                )
-            if not _pending_ids and not _uncorroborated:
-                _msg_parts.append(
-                    "All hypotheses resolved and corroborated. Write your final summary and call DONE."
-                )
-            user_content = (
-                f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated — GRID COVERED]. "
-                f"{summary_block}\n\n" + " ".join(_msg_parts)
-            )
-        elif _next_grid is not None and _floor_seeds_done:
-            # Floor seeds done; guide agent to next grid cell
-            tp = _next_grid.get("tool_params", {})
-            params_str = (
-                ", ".join(f"{k}={repr(v)}" for k, v in sorted(tp.items()))
-                if tp else "(no params)"
-            )
-            n_done_grid = sum(
-                1 for h in hypotheses
-                if h.get("seeded_by") == "grid" and h["status"] != "pending"
-            )
-            grid_hint = (
-                f"GRID CELL {_next_grid['id']} ({n_done_grid}/{n_grid} done) — "
-                f"question_type={_next_grid.get('question_type','?')}: "
-                f"use {_next_grid.get('tool','?')}({params_str}) and evaluate {_next_grid['id']}."
-            )
-            user_content = (
-                f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. "
-                f"{summary_block}\n\n{grid_hint}"
+        elif _no_pending and _all_corroborated:
+            gate_state = (
+                "DONE permitted now: floor+grid done, no pending, all uncertain corroborated. "
+                "If no open_questions remain worth pursuing, write the final synthesis as your "
+                "thought, set next_action.choice=finalize, and choose action=DONE."
             )
         else:
-            user_content = f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. {summary_block}\n\nWhat will you investigate?"
+            gate_state = (
+                "DONE NOT YET permitted — address the items above. You decide which open question "
+                "to pursue next; the runner imposes no order."
+            )
+        user_content = (
+            f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. "
+            f"{summary_block}\n\n" + "\n".join(ledger_lines) + f"\n\n{gate_state}"
+        )
 
         messages.append({"role": "user", "content": user_content})
 
