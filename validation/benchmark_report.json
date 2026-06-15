@@ -1,0 +1,185 @@
+[
+  {
+    "label": "OE",
+    "groupA": "Ovarian endometriosis",
+    "groupB": "Healthy endometrium",
+    "n_cohorts": 5,
+    "n_sig_pathways_pooled": 40,
+    "n_sig_pathways_pooled_only": 1,
+    "pooled_only_sig_pathways": [
+      "HALLMARK_BILE_ACID_METABOLISM"
+    ],
+    "cohort": [
+      {
+        "cohort": "DEG 8",
+        "source_file": "wynik_GSE141549_OEvsEH.csv.gz",
+        "n_genes": 19745,
+        "de_jaccard": {
+          "100": 0.22699386503067484,
+          "500": 0.25156445556946183
+        },
+        "de_spearman": 0.9084359326789797,
+        "pathway_jaccard_top": 0.3333333333333333,
+        "n_sig_pathways_cohort": 20,
+        "shared_sig_pathways": 19,
+        "direction_agreement_on_shared": 1.0
+      },
+      {
+        "cohort": "DEG 10",
+        "source_file": "wynik_GSE201912_OEvsEH.csv.gz",
+        "n_genes": 27283,
+        "de_jaccard": {
+          "100": 0.15606936416184972,
+          "500": 0.1655011655011655
+        },
+        "de_spearman": 0.8723878891952188,
+        "pathway_jaccard_top": 0.6,
+        "n_sig_pathways_cohort": 42,
+        "shared_sig_pathways": 36,
+        "direction_agreement_on_shared": 0.9722222222222222
+      },
+      {
+        "cohort": "DEG 12",
+        "source_file": "wynik_GSE282532_EHvsOE.csv.gz",
+        "n_genes": 16522,
+        "de_jaccard": {
+          "100": 0.19047619047619047,
+          "500": 0.19189511323003575
+        },
+        "de_spearman": 0.917919533499516,
+        "pathway_jaccard_top": 0.21212121212121213,
+        "n_sig_pathways_cohort": 24,
+        "shared_sig_pathways": 23,
+        "direction_agreement_on_shared": 1.0
+      },
+      {
+        "cohort": "DEG 13",
+        "source_file": "wynik_GSE37837_OEvsEH.csv.gz",
+        "n_genes": 19595,
+        "de_jaccard": {
+          "100": 0.03626943005181347,
+          "500": 0.0559662090813094
+        },
+        "de_spearman": 0.7663233830152203,
+        "pathway_jaccard_top": 0.42857142857142855,
+        "n_sig_pathways_cohort": 28,
+        "shared_sig_pathways": 24,
+        "direction_agreement_on_shared": 0.5416666666666666
+      },
+      {
+        "cohort": "DEG 14",
+        "source_file": "wynik_GSE7305_OEvsEH.csv.gz",
+        "n_genes": 20814,
+        "de_jaccard": {
+          "100": 0.19047619047619047,
+          "500": 0.19047619047619047
+        },
+        "de_spearman": 0.9370754340582976,
+        "pathway_jaccard_top": 0.42857142857142855,
+        "n_sig_pathways_cohort": 33,
+        "shared_sig_pathways": 31,
+        "direction_agreement_on_shared": 1.0
+      }
+    ]
+  },
+  {
+    "label": "PE",
+    "groupA": "Peritoneal endometriosis",
+    "groupB": "Healthy endometrium",
+    "n_cohorts": 2,
+    "n_sig_pathways_pooled": 31,
+    "n_sig_pathways_pooled_only": 1,
+    "pooled_only_sig_pathways": [
+      "HALLMARK_WNT_BETA_CATENIN_SIGNALING"
+    ],
+    "cohort": [
+      {
+        "cohort": "DEG 3",
+        "source_file": "wynik_GSE11691_PEvsEH.csv.gz",
+        "n_genes": 12643,
+        "de_jaccard": {
+          "100": 0.015228426395939087,
+          "500": 0.04712041884816754
+        },
+        "de_spearman": 0.7626771193164549,
+        "pathway_jaccard_top": 0.3333333333333333,
+        "n_sig_pathways_cohort": 28,
+        "shared_sig_pathways": 23,
+        "direction_agreement_on_shared": 0.8260869565217391
+      },
+      {
+        "cohort": "DEG 7",
+        "source_file": "wynik_GSE141549_EHvsPE.csv.gz",
+        "n_genes": 19745,
+        "de_jaccard": {
+          "100": 0.32450331125827814,
+          "500": 0.3477088948787062
+        },
+        "de_spearman": 0.9619774810232341,
+        "pathway_jaccard_top": 0.48148148148148145,
+        "n_sig_pathways_cohort": 30,
+        "shared_sig_pathways": 26,
+        "direction_agreement_on_shared": 1.0
+      }
+    ]
+  },
+  {
+    "label": "DIE",
+    "groupA": "Deep infiltrating endometriosis",
+    "groupB": "Healthy endometrium",
+    "n_cohorts": 3,
+    "n_sig_pathways_pooled": 29,
+    "n_sig_pathways_pooled_only": 5,
+    "pooled_only_sig_pathways": [
+      "HALLMARK_ANGIOGENESIS",
+      "HALLMARK_NOTCH_SIGNALING",
+      "HALLMARK_HEME_METABOLISM",
+      "HALLMARK_WNT_BETA_CATENIN_SIGNALING",
+      "HALLMARK_OXIDATIVE_PHOSPHORYLATION"
+    ],
+    "cohort": [
+      {
+        "cohort": "DEG 1",
+        "source_file": "wynik_GSE11691_DIEvsEH.csv.gz",
+        "n_genes": 12643,
+        "de_jaccard": {
+          "100": 0.0582010582010582,
+          "500": 0.1185682326621924
+        },
+        "de_spearman": 0.7535692987590948,
+        "pathway_jaccard_top": 0.3333333333333333,
+        "n_sig_pathways_cohort": 22,
+        "shared_sig_pathways": 15,
+        "direction_agreement_on_shared": 1.0
+      },
+      {
+        "cohort": "DEG 4",
+        "source_file": "wynik_GSE141549_DIEvsEH.csv.gz",
+        "n_genes": 19745,
+        "de_jaccard": {
+          "100": 0.3157894736842105,
+          "500": 0.28205128205128205
+        },
+        "de_spearman": 0.9508203789878112,
+        "pathway_jaccard_top": 0.48148148148148145,
+        "n_sig_pathways_cohort": 23,
+        "shared_sig_pathways": 22,
+        "direction_agreement_on_shared": 1.0
+      },
+      {
+        "cohort": "DEG 11",
+        "source_file": "wynik_GSE25628_DIEvsEH.csv.gz",
+        "n_genes": 12643,
+        "de_jaccard": {
+          "100": 0.005025125628140704,
+          "500": 0.02354145342886387
+        },
+        "de_spearman": 0.5835158182288617,
+        "pathway_jaccard_top": 0.21212121212121213,
+        "n_sig_pathways_cohort": 0,
+        "shared_sig_pathways": 0,
+        "direction_agreement_on_shared": NaN
+      }
+    ]
+  }
+]
