@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -378,6 +380,17 @@ def meta_gsea(datasets: list, deg_datasets: dict = None,
         return {"error": "groupA and groupB are required"}
 
     mappings = mappings or {}
+    # Optional env overrides — used by the null-calibration diagnostic to run
+    # at lower fidelity. Production runs leave the args unchanged.
+    _env_perm = os.environ.get("META_GSEA_PERMUTATION_NUM")
+    if _env_perm:
+        try:
+            permutation_num = int(_env_perm)
+        except ValueError:
+            pass
+    _env_prefix = os.environ.get("META_GSEA_COLLECTION_PREFIX")
+    if _env_prefix and not collection_prefix:
+        collection_prefix = _env_prefix
     rnk = meta_rank(datasets, deg_datasets or {}, groupA, groupB, mappings=mappings)
     if rnk.empty:
         return {"error": f"No data found for {groupA!r} vs {groupB!r} across any dataset"}

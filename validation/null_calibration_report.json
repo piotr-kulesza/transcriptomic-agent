@@ -1,0 +1,408 @@
+{
+  "real": {
+    "total": 27,
+    "confirmed": 18,
+    "uncertain": 9,
+    "by_seed": {
+      "auto_gsea": {
+        "total": 6,
+        "confirmed": 4
+      },
+      "auto_cross": {
+        "total": 4,
+        "confirmed": 0
+      },
+      "grid": {
+        "total": 17,
+        "confirmed": 14
+      }
+    }
+  },
+  "null_runs": [
+    {
+      "total": 27,
+      "confirmed": 0,
+      "uncertain": 27,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 0
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 1,
+      "uncertain": 26,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 1
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 0,
+      "uncertain": 27,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 0
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 0,
+      "uncertain": 27,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 0
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 5,
+      "uncertain": 22,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 1
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 4
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 5,
+      "uncertain": 22,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 1
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 4
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 0,
+      "uncertain": 27,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 0
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 6,
+      "uncertain": 21,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 1
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 5
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 5,
+      "uncertain": 22,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 1
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 4
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 0,
+      "uncertain": 27,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 0
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 7,
+      "uncertain": 20,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 1
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 6
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 1,
+      "uncertain": 26,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 1
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 1,
+      "uncertain": 26,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 1
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 0,
+      "uncertain": 27,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 0
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 0,
+      "uncertain": 27,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 0
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 4,
+      "uncertain": 23,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 1
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 3
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 7,
+      "uncertain": 20,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 1
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 6
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 6,
+      "uncertain": 21,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 1
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 5
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 0,
+      "uncertain": 27,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 0
+        }
+      }
+    },
+    {
+      "total": 27,
+      "confirmed": 0,
+      "uncertain": 27,
+      "by_seed": {
+        "auto_gsea": {
+          "total": 6,
+          "confirmed": 0
+        },
+        "auto_cross": {
+          "total": 4,
+          "confirmed": 0
+        },
+        "grid": {
+          "total": 17,
+          "confirmed": 0
+        }
+      }
+    }
+  ],
+  "n_perm": 20,
+  "seed": 42,
+  "real_rate": 0.6666666666666666,
+  "null_rate_mean": 0.08888888888888888,
+  "null_rate_se": 0.023176396019807952
+}
