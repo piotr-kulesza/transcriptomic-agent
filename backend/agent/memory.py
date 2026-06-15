@@ -1,15 +1,17 @@
 """
-Cross-run knowledge store for the AI-as-PI agent.
+Cross-run knowledge helpers for the AI-as-PI agent.
 
-Disease-agnostic. Each entry is keyed by (canonical_pair, item) where:
+Disease-agnostic. Each entry is keyed by (canonical_pair, item, direction) where:
   - canonical_pair: a "{groupA} vs {groupB}" string in canonical orientation
     (non-reference first; same string regardless of input order).
   - item: a pathway name or gene symbol as an opaque string.
+  - direction: stored on each entry; opposite-direction signals flip into the
+    contradiction counter rather than overwriting the majority view.
 
-The store records what previous runs established, with provenance and support /
-contradiction counts. Prior knowledge informs the PI's PRIORITY and interpretation —
-it never auto-confirms. Every confirmation still goes through the current-run
-evidence gate (≥2 orthogonal families + ≥2 datasets + FDR + direction-check).
+These functions operate on plain dicts and a path. The runner does NOT call
+them directly — it goes through `memory_store.MemoryStore`, which scopes every
+read/write by `(user_id, project_id)` so different users / projects never
+share a knowledge file.
 """
 from __future__ import annotations
 
@@ -22,7 +24,6 @@ from typing import Iterable
 
 logger = logging.getLogger(__name__)
 
-KNOWLEDGE_PATH = "memory/knowledge.json"
 SCHEMA_VERSION = 1
 MAX_PROVENANCE_PER_ENTRY = 20    # cap history per entry; oldest dropped
 MAX_PRIOR_ENTRIES_IN_PROMPT = 30  # cap rendered into system prompt
@@ -32,7 +33,7 @@ def _empty_store() -> dict:
     return {"version": SCHEMA_VERSION, "entries": []}
 
 
-def load_knowledge(path: str = KNOWLEDGE_PATH) -> dict:
+def load_knowledge(path: str) -> dict:
     """Load knowledge.json (or return an empty store). Malformed files → empty store + log."""
     if not os.path.exists(path):
         return _empty_store()
@@ -48,7 +49,7 @@ def load_knowledge(path: str = KNOWLEDGE_PATH) -> dict:
         return _empty_store()
 
 
-def save_knowledge(knowledge: dict, path: str = KNOWLEDGE_PATH) -> None:
+def save_knowledge(knowledge: dict, path: str) -> None:
     """Atomic write of knowledge.json. Creates parent dir if missing."""
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(prefix=".knowledge-", suffix=".tmp", dir=os.path.dirname(path) or ".")

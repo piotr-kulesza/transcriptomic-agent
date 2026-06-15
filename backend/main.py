@@ -18,6 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from .agent.runner import run_agent_loop
+from .agent.memory_store import derive_project_id
 
 load_dotenv()
 
@@ -290,6 +291,8 @@ class RunRequest(BaseModel):
     group_cols: dict[str, str]  # dataset_id → chosen group_col
     max_hypotheses: int = 3
     mode: str = "reproduce"  # "reproduce" | "explore"
+    user_id: str = "local"
+    project_id: Optional[str] = None  # auto-derived from dataset/group fingerprint if absent
 
 
 @app.post("/api/run")
@@ -310,14 +313,24 @@ async def run_agent(req: RunRequest):
         datasets.append(ds)
 
     temperature = 0.0 if req.mode == "reproduce" else 1.0
-    logger.info("Run started: datasets=%s max_hypotheses=%d mode=%s", req.dataset_ids, req.max_hypotheses, req.mode)
+    run_deg_datasets = dict(deg_store)
+    run_mappings = dict(group_mappings)
+    project_id = req.project_id or derive_project_id(datasets, run_deg_datasets, run_mappings)
+    logger.info(
+        "Run started: user=%s project=%s datasets=%s max_hypotheses=%d mode=%s",
+        req.user_id, project_id, req.dataset_ids, req.max_hypotheses, req.mode,
+    )
 
     async def generate():
-        async for event in run_agent_loop(datasets, req.max_hypotheses, api_key, temperature=temperature, mappings=dict(group_mappings), deg_datasets=dict(deg_store)):
+        async for event in run_agent_loop(
+            datasets, req.max_hypotheses, api_key,
+            temperature=temperature, mappings=run_mappings, deg_datasets=run_deg_datasets,
+            user_id=req.user_id, project_id=project_id,
+        ):
             if event.get("type") == "error":
                 logger.error("Agent error: %s", event.get("text", ""))
             yield f"data: {json.dumps(event, default=str)}\n\n"
-        logger.info("Run finished: datasets=%s", req.dataset_ids)
+        logger.info("Run finished: user=%s project=%s datasets=%s", req.user_id, project_id, req.dataset_ids)
         yield "data: {\"type\":\"stream_end\"}\n\n"
 
     return StreamingResponse(

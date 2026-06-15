@@ -76,25 +76,36 @@ from ..agent.coverage import build_coverage_grid, K_OFF_GRID, _MAX_AUTO_RAISE
 from ..agent.engine import characterize, build_layer1_summary
 from ..agent.orient import detect_reference_group, canonical_order
 from ..agent.memory import (
-    load_knowledge, save_knowledge, relevant_entries, format_prior_knowledge_block,
-    extract_claims_from_hypotheses, merge_claims, canonical_pairs_from_datasets,
-    KNOWLEDGE_PATH,
+    relevant_entries, format_prior_knowledge_block,
+    extract_claims_from_hypotheses, canonical_pairs_from_datasets,
+)
+from ..agent.memory_store import (
+    FileMemoryStore, derive_project_id,
+    DEFAULT_USER_ID, DEFAULT_PROJECT_ID, DEFAULT_MEMORY_ROOT,
+    _safe_segment,
 )
 from ..tools.registry import TOOLS, CROSS_TOOL_NAMES, DEG_TOOL_NAMES, summarize_result
 from ..tools.sandbox import execute_sandbox
 
-REPORTS_DIR = "reports"
+REPORTS_ROOT = "reports"
+
+
+def _namespaced_reports_dir(user_id: str, project_id: str) -> str:
+    user_seg = _safe_segment(user_id, DEFAULT_USER_ID)
+    proj_seg = _safe_segment(project_id, DEFAULT_PROJECT_ID)
+    return os.path.join(REPORTS_ROOT, user_seg, proj_seg)
 
 
 def _write_report(
     datasets: list, seed_summary: str, seed_data: dict, steps: list, hypotheses: list, done_text: str,
     prior_entries: list[dict] | None = None, contradictions: list[dict] | None = None,
+    reports_dir: str = REPORTS_ROOT,
 ) -> str:
     """Write a Markdown report of the agent run. Returns the file path."""
-    os.makedirs(REPORTS_DIR, exist_ok=True)
+    os.makedirs(reports_dir, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     ds_names = "_".join(ds["name"].replace(" ", "-") for ds in datasets) or "no-raw-datasets"
-    path = os.path.join(REPORTS_DIR, f"run_{ts}_{ds_names}.md")
+    path = os.path.join(reports_dir, f"run_{ts}_{ds_names}.md")
 
     lines = []
     lines.append(f"# Transcriptomic Agent Report")
@@ -548,13 +559,32 @@ async def run_agent_loop(
     temperature: float = 0.0,
     mappings: dict = None,
     deg_datasets: dict = None,
+    user_id: str = DEFAULT_USER_ID,
+    project_id: str | None = None,
+    memory_store: FileMemoryStore | None = None,
+    reports_root: str = REPORTS_ROOT,
 ) -> AsyncGenerator[dict, None]:
     """
     Async generator — yields log event dicts.
     Consumed by FastAPI StreamingResponse.
+
+    All persistence (memory + reports) is scoped by `(user_id, project_id)`.
+    A `MemoryStore` instance may be injected for tests; by default a
+    `FileMemoryStore` rooted at `memory/` is used.
     """
     mappings = mappings or {}
     deg_datasets = deg_datasets or {}
+    if memory_store is None:
+        memory_store = FileMemoryStore(root=DEFAULT_MEMORY_ROOT)
+    if not project_id:
+        project_id = derive_project_id(datasets, deg_datasets, mappings)
+    if not user_id:
+        user_id = DEFAULT_USER_ID
+    reports_dir = os.path.join(
+        reports_root,
+        _safe_segment(user_id, DEFAULT_USER_ID),
+        _safe_segment(project_id, DEFAULT_PROJECT_ID),
+    )
     client = anthropic.AsyncAnthropic(api_key=api_key)
 
     all_genes = [set(ds["expr"].index) for ds in datasets]
@@ -569,14 +599,15 @@ async def run_agent_loop(
         logger.info("Canonical reference group detected: '%s'", _reference_group)
 
     # ── Cross-run memory: load prior knowledge relevant to this run's pairs ──
-    knowledge_store = await loop.run_in_executor(None, load_knowledge, KNOWLEDGE_PATH)
+    # Scoped strictly to (user_id, project_id). No other namespace is ever read.
+    knowledge_store = await loop.run_in_executor(None, memory_store.get, user_id, project_id)
     current_pairs = canonical_pairs_from_datasets(datasets, deg_datasets, mappings, _reference_group)
     prior_entries = relevant_entries(knowledge_store, current_pairs)
     prior_knowledge_text = format_prior_knowledge_block(prior_entries)
     if prior_entries:
         logger.info(
-            "Loaded %d prior-knowledge entries relevant to current pairs (of %d total in store)",
-            len(prior_entries), len(knowledge_store.get("entries", [])),
+            "Loaded %d prior-knowledge entries for user=%s project=%s (of %d total in namespace)",
+            len(prior_entries), user_id, project_id, len(knowledge_store.get("entries", [])),
         )
     # Run identity (used later when persisting claims and contradictions)
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -944,19 +975,23 @@ async def run_agent_loop(
             # Persist to cross-run knowledge store and collect any direction-flip contradictions
             run_meta = {
                 "run_id": run_id,
+                "user_id": user_id,
+                "project_id": project_id,
                 "datasets": [ds["name"] for ds in datasets] + sorted(deg_datasets.keys()),
                 "groups": sorted({g for ds in datasets for g in ds.get("groups", [])}),
                 "model": "claude-opus-4-8",
             }
             new_claims = extract_claims_from_hypotheses(hypotheses, direction_claims_by_hid)
-            updated_store, contradictions = merge_claims(knowledge_store, new_claims, run_meta)
+            contradictions: list[dict] = []
             try:
-                await loop.run_in_executor(None, save_knowledge, updated_store, KNOWLEDGE_PATH)
+                contradictions = await loop.run_in_executor(
+                    None, memory_store.merge, user_id, project_id, new_claims, run_meta,
+                )
             except Exception as e:
-                logger.error("Failed to persist knowledge store: %s", e)
+                logger.error("Failed to persist knowledge for user=%s project=%s: %s", user_id, project_id, e)
             report_path = await loop.run_in_executor(
                 None, _write_report, datasets, seed_summary, seed_data, report_steps, hypotheses, thought,
-                prior_entries, contradictions,
+                prior_entries, contradictions, reports_dir,
             )
             yield {"type": "report", "path": report_path}
             return
@@ -1186,18 +1221,22 @@ async def run_agent_loop(
     yield {"type": "done", "text": done_text, "exhausted": True}
     run_meta = {
         "run_id": run_id,
+        "user_id": user_id,
+        "project_id": project_id,
         "datasets": [ds["name"] for ds in datasets] + sorted(deg_datasets.keys()),
         "groups": sorted({g for ds in datasets for g in ds.get("groups", [])}),
         "model": "claude-opus-4-8",
     }
     new_claims = extract_claims_from_hypotheses(hypotheses, direction_claims_by_hid)
-    updated_store, contradictions = merge_claims(knowledge_store, new_claims, run_meta)
+    contradictions: list[dict] = []
     try:
-        await loop.run_in_executor(None, save_knowledge, updated_store, KNOWLEDGE_PATH)
+        contradictions = await loop.run_in_executor(
+            None, memory_store.merge, user_id, project_id, new_claims, run_meta,
+        )
     except Exception as e:
-        logger.error("Failed to persist knowledge store: %s", e)
+        logger.error("Failed to persist knowledge for user=%s project=%s: %s", user_id, project_id, e)
     report_path = await loop.run_in_executor(
         None, _write_report, datasets, seed_summary, seed_data, report_steps, hypotheses, done_text,
-        prior_entries, contradictions,
+        prior_entries, contradictions, reports_dir,
     )
     yield {"type": "report", "path": report_path}
