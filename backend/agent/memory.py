@@ -205,14 +205,22 @@ def extract_claims_from_hypotheses(
                 if item and direction and in_group:
                     signals.append((item, direction, in_group))
 
+        # Carry any translational annotation attached to the hypothesis through to
+        # each emitted claim. The annotation is stored on entries as a pure
+        # annotation tag — it never increments support_count or contradiction_count.
+        translational = h.get("translational") if isinstance(h.get("translational"), dict) else None
+
         for item, direction, in_group in signals:
-            out.append({
+            entry = {
                 "claim": {"pair": pair, "item": item, "direction": direction, "in_group": in_group},
                 "verdict": status,
                 "evidence_summary": ev_summary,
                 "hypothesis_id": h.get("id"),
                 "hypothesis_text": h.get("text", ""),
-            })
+            }
+            if translational:
+                entry["translational_annotation"] = translational
+            out.append(entry)
     return out
 
 
@@ -273,6 +281,11 @@ def merge_claims(
             "evidence_summary": c.get("evidence_summary") or {},
         }
 
+        # Translational annotation, if present, rides along on the claim. It is
+        # explicitly tagged as annotation — never counted toward support or
+        # contradiction, never inspected by the evidence gate.
+        translational_annotation = c.get("translational_annotation")
+
         key = _entry_key(pair, item)
         existing = index.get(key)
         if existing is None:
@@ -286,6 +299,8 @@ def merge_claims(
                 "first_seen": timestamp,
                 "last_updated": timestamp,
             }
+            if translational_annotation:
+                entry["translational_annotation"] = translational_annotation
             knowledge["entries"].append(entry)
             index[key] = entry
             continue
@@ -318,6 +333,11 @@ def merge_claims(
         existing.setdefault("provenance", []).append(prov_entry)
         existing["provenance"] = existing["provenance"][-MAX_PROVENANCE_PER_ENTRY:]
         existing["last_updated"] = timestamp
+        # Refresh the translational annotation if the current run carried a newer one.
+        # Annotation is overwritten (latest-wins), NOT accumulated, since it is a
+        # reporting layer — not an evidence vote.
+        if translational_annotation:
+            existing["translational_annotation"] = translational_annotation
         # Refresh evidence_summary if the new run is stronger
         new_ev = c.get("evidence_summary") or {}
         cur_ev = existing.get("evidence_summary") or {}

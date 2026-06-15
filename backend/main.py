@@ -293,6 +293,14 @@ class RunRequest(BaseModel):
     mode: str = "reproduce"  # "reproduce" | "explore"
     user_id: str = "local"
     project_id: Optional[str] = None  # auto-derived from dataset/group fingerprint if absent
+    # Translational annotation (opt-in). When True, after a hypothesis is CONFIRMED
+    # by the evidence gate, leading-edge genes are looked up against Open Targets,
+    # ChEMBL, and ClinicalTrials and the result is attached as REPORTING-ONLY
+    # annotation. It never feeds the verdict or the gate. Disease-agnostic;
+    # `condition` is an optional string used to scope disease-association and
+    # trials queries.
+    translational: bool = False
+    condition: Optional[str] = None
 
 
 @app.post("/api/run")
@@ -326,6 +334,7 @@ async def run_agent(req: RunRequest):
             datasets, req.max_hypotheses, api_key,
             temperature=temperature, mappings=run_mappings, deg_datasets=run_deg_datasets,
             user_id=req.user_id, project_id=project_id,
+            translational=req.translational, condition=req.condition,
         ):
             if event.get("type") == "error":
                 logger.error("Agent error: %s", event.get("text", ""))

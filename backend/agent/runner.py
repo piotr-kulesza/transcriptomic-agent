@@ -84,6 +84,9 @@ from ..agent.memory_store import (
     DEFAULT_USER_ID, DEFAULT_PROJECT_ID, DEFAULT_MEMORY_ROOT,
     _safe_segment,
 )
+from ..agent.translational import (
+    annotate_translational, build_translational_cache, render_translational_markdown,
+)
 from ..tools.registry import TOOLS, CROSS_TOOL_NAMES, DEG_TOOL_NAMES, summarize_result
 from ..tools.sandbox import execute_sandbox
 
@@ -245,6 +248,13 @@ def _write_report(
             if h.get("evidence"):
                 for ev in h["evidence"]:
                     lines.append(f"- Step {ev['step']} [`{ev['action']}`]: {ev['reasoning']}")
+            # Translational annotation: ONLY for confirmed hypotheses, in its own subsection
+            # so no reader conflates "druggable target exists" with "hypothesis confirmed".
+            if (h.get("status") or "").lower() == "confirmed" and h.get("translational"):
+                rendered = render_translational_markdown(h["translational"])
+                if rendered:
+                    lines.append("")
+                    lines.append(rendered)
             lines.append("")
     else:
         lines.append("_No hypotheses proposed._")
@@ -563,6 +573,8 @@ async def run_agent_loop(
     project_id: str | None = None,
     memory_store: FileMemoryStore | None = None,
     reports_root: str = REPORTS_ROOT,
+    translational: bool = False,
+    condition: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Async generator — yields log event dicts.
@@ -604,6 +616,33 @@ async def run_agent_loop(
     current_pairs = canonical_pairs_from_datasets(datasets, deg_datasets, mappings, _reference_group)
     prior_entries = relevant_entries(knowledge_store, current_pairs)
     prior_knowledge_text = format_prior_knowledge_block(prior_entries)
+
+    # Translational annotation cache (from prior runs) — only used when flag is on.
+    # This lets re-runs skip re-querying genes whose confirmed axis is unchanged.
+    translational_cache = build_translational_cache(knowledge_store) if translational else {}
+
+    async def _annotate_confirmed(h: dict) -> None:
+        """Run the translational annotator on a CONFIRMED hypothesis.
+        Pure side-channel — never raises, never mutates verdict/evidence."""
+        if not translational:
+            return
+        if (h.get("status") or "").lower() != "confirmed":
+            return
+        if h.get("translational"):
+            return  # already annotated
+        try:
+            annotation = await loop.run_in_executor(
+                None, annotate_translational, h, condition or "", translational_cache
+            )
+        except Exception as e:
+            logger.warning("translational annotation failed for %s: %s", h.get("id"), e)
+            return
+        h["translational"] = annotation
+        # Feed back into the cache so later confirms reuse the same gene lookups.
+        for rec in annotation.get("genes") or []:
+            g = (rec.get("gene") or "").upper()
+            if g:
+                translational_cache[g] = {"condition": condition or "", "record": rec}
     if prior_entries:
         logger.info(
             "Loaded %d prior-knowledge entries for user=%s project=%s (of %d total in namespace)",
@@ -656,6 +695,11 @@ async def run_agent_loop(
         yield {"type": "hypothesis_propose", "hypothesis": dict(s)}
     for g in grid_hypotheses:
         yield {"type": "hypothesis_propose", "hypothesis": dict(g)}
+    # Translational annotation for any Layer 1 CONFIRMED — never affects verdicts.
+    if translational:
+        for hyp in hypotheses:
+            if hyp.get("status") == "confirmed":
+                await _annotate_confirmed(hyp)
     # Emit hypothesis_eval events so the frontend renders the engine verdicts
     for hyp in hypotheses:
         if hyp.get("seeded_by") in ("auto_gsea", "grid") and hyp["status"] != "pending":
@@ -1176,6 +1220,11 @@ async def run_agent_loop(
                         )
 
                 h["status"] = verdict
+                # Translational annotation runs ONLY on confirmed verdicts after the gate
+                # has passed. It is reporting / annotation, never evidence — it cannot
+                # change `verdict` or be inspected by the gate.
+                if verdict == "confirmed":
+                    await _annotate_confirmed(h)
                 yield {
                     "type": "hypothesis_eval",
                     "hypothesis": dict(h),
