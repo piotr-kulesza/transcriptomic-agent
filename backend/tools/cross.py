@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -14,6 +16,59 @@ def resolve_group(group_name: str, mappings: dict) -> str:
         if group_name in aliases or group_name == canonical:
             return canonical
     return group_name
+
+
+# 95% normal CI half-width factor — used to convert a (CI_L, CI_R) pair to SE
+# via SE = (CI_R - CI_L) / (2 * Z_975).
+_Z_975 = 1.959963984540054
+
+
+def _dersimonian_laird(effects: np.ndarray, variances: np.ndarray) -> dict:
+    """
+    DerSimonian–Laird random-effects pooled estimate with heterogeneity stats.
+
+    Pure-numpy. Returns ``{}`` when fewer than 2 finite (effect, variance) pairs
+    survive. All inputs are interpreted on the same effect scale (e.g. logFC).
+
+    Heterogeneity reported:
+      - Q       : Cochran's Q statistic
+      - q_p     : Q's chi-square p-value (df = k-1)
+      - tau2    : DL between-study variance estimate (≥0)
+      - i2      : Higgins I² in [0, 1] — fraction of variance not from sampling
+      - n_studies: number of contributing studies after filtering
+    """
+    e = np.asarray(effects, dtype=float)
+    v = np.asarray(variances, dtype=float)
+    finite = np.isfinite(e) & np.isfinite(v) & (v > 0)
+    e, v = e[finite], v[finite]
+    k = len(e)
+    if k < 2:
+        return {}
+
+    w = 1.0 / v
+    sw = float(np.sum(w))
+    fe_mean = float(np.sum(w * e) / sw)
+    q = float(np.sum(w * (e - fe_mean) ** 2))
+    df = k - 1
+    c = sw - float(np.sum(w ** 2) / sw)
+    tau2 = max(0.0, (q - df) / c) if c > 0 else 0.0
+    w_re = 1.0 / (v + tau2)
+    sw_re = float(np.sum(w_re))
+    re_mean = float(np.sum(w_re * e) / sw_re)
+    re_se = float(np.sqrt(1.0 / sw_re))
+    q_p = float(_chi2.sf(q, df)) if df > 0 else 1.0
+    i2 = max(0.0, (q - df) / q) if q > 0 else 0.0
+    return {
+        "pooled_effect": re_mean,
+        "pooled_se": re_se,
+        "ci_low": re_mean - _Z_975 * re_se,
+        "ci_high": re_mean + _Z_975 * re_se,
+        "tau2": tau2,
+        "i2": i2,
+        "q": q,
+        "q_p": q_p,
+        "n_studies": k,
+    }
 
 
 def _cohen_d(a, b):
@@ -52,7 +107,7 @@ def cross_dataset_de(datasets, groupA=None, groupB=None, deg_datasets=None,
     Also integrates pre-computed DEG tables (deg_datasets) into the Fisher meta-analysis.
     """
     mappings = mappings or {}
-    per_ds: dict[str, dict] = {}  # gene → {source_name → {logFC, rbc, p, adj_p}}
+    per_ds: dict[str, dict] = {}  # gene → {source_name → {logFC, rbc, p, adj_p, se}}
     used = []  # raw dataset names that matched
 
     for ds in datasets:
@@ -72,6 +127,14 @@ def cross_dataset_de(datasets, groupA=None, groupB=None, deg_datasets=None,
         log_fc = expr[sA].mean(axis=1).values - expr[sB].mean(axis=1).values
         rbc = 1.0 - 2.0 * U / (nA * nB)
 
+        # Per-gene pooled SD → SE of the mean difference (delta method).
+        # Used as the per-study variance for DL random-effects pooling.
+        a_vals = expr[sA].values.astype(float)
+        b_vals = expr[sB].values.astype(float)
+        var_a = a_vals.var(axis=1, ddof=1) if nA > 1 else np.zeros(a_vals.shape[0])
+        var_b = b_vals.var(axis=1, ddof=1) if nB > 1 else np.zeros(b_vals.shape[0])
+        se_logfc = np.sqrt(np.maximum(var_a / nA + var_b / nB, 1e-12))
+
         _, adj_p, _, _ = multipletests(np.nan_to_num(p_raw, nan=1.0), method="fdr_bh")
 
         for i, gene in enumerate(expr.index):
@@ -82,6 +145,7 @@ def cross_dataset_de(datasets, groupA=None, groupB=None, deg_datasets=None,
                 "rbc":   float(rbc[i]),
                 "p":     float(p_raw[i]) if not np.isnan(p_raw[i]) else 1.0,
                 "adj_p": float(adj_p[i]),
+                "se":    float(se_logfc[i]),
             }
 
     # Integrate pre-computed DEG tables
@@ -98,14 +162,28 @@ def cross_dataset_de(datasets, groupA=None, groupB=None, deg_datasets=None,
                 continue
             df = comp["df"]
             deg_used.append(ds_name)
-            for gene, row in df.iterrows():
+            has_se = "se" in df.columns
+            has_ci = "ci_l" in df.columns and "ci_r" in df.columns
+            se_arr: np.ndarray | None = None
+            if has_se:
+                se_arr = np.abs(df["se"].astype(float).values)
+            elif has_ci:
+                se_arr = np.abs(df["ci_r"].astype(float).values - df["ci_l"].astype(float).values) / (2.0 * _Z_975)
+            for i, (gene, row) in enumerate(df.iterrows()):
                 if gene not in per_ds:
                     per_ds[gene] = {}
+                se_val: float | None
+                if se_arr is not None:
+                    se_v = float(se_arr[i])
+                    se_val = se_v if np.isfinite(se_v) and se_v > 0 else None
+                else:
+                    se_val = None
                 per_ds[gene][ds_name] = {
                     "logFC": float(row["logFC"]) * direction,
                     "rbc":   None,
                     "p":     float(row["p"]),
                     "adj_p": float(row["adj_p"]),
+                    "se":    se_val,
                 }
 
     all_sources = used + deg_used
@@ -122,6 +200,7 @@ def cross_dataset_de(datasets, groupA=None, groupB=None, deg_datasets=None,
     n_directionally_inconsistent = 0
     n_below_effect_size = 0
     fisher_genes, fisher_ps, entries = [], [], []
+    n_high_heterogeneity = 0
     for gene in common:
         dm = per_ds[gene]
         # Use all available sources for this gene
@@ -140,6 +219,20 @@ def cross_dataset_de(datasets, groupA=None, groupB=None, deg_datasets=None,
         fisher_p = float(_chi2.sf(chi2_stat, df=2 * len(gene_sources)))
         fisher_genes.append(gene)
         fisher_ps.append(fisher_p)
+        # DerSimonian-Laird random-effects pooled effect across sources with SE.
+        # Sources without SE (no CI columns and no `se` field) drop out of the RE
+        # pool; the gene still appears via Fisher-meta + direction-consistency.
+        re_effects, re_vars = [], []
+        for s in gene_sources:
+            se = dm[s].get("se")
+            if se is not None and se > 0:
+                re_effects.append(dm[s]["logFC"])
+                re_vars.append(float(se) ** 2)
+        re_stats = _dersimonian_laird(np.asarray(re_effects), np.asarray(re_vars))
+        i2 = re_stats.get("i2")
+        high_het = bool(i2 is not None and i2 >= 0.75)
+        if high_het:
+            n_high_heterogeneity += 1
         entries.append({
             "gene": gene,
             "direction": "UP" if lfcs[0] > 0 else "DOWN",
@@ -147,11 +240,23 @@ def cross_dataset_de(datasets, groupA=None, groupB=None, deg_datasets=None,
             "fisher_p": fisher_p,
             "n_sig_datasets": sum(1 for s in gene_sources if (dm[s]["adj_p"] or 1.0) < 0.05),
             "n_datasets": len(gene_sources),
+            # Random-effects (DerSimonian-Laird) pooled estimate. Empty when fewer
+            # than 2 sources expose SE/CI — caller should fall back to fisher_p.
+            "re_pooled_logFC": round(re_stats["pooled_effect"], 3) if re_stats else None,
+            "re_pooled_se":    round(re_stats["pooled_se"], 4) if re_stats else None,
+            "re_ci_low":       round(re_stats["ci_low"], 3) if re_stats else None,
+            "re_ci_high":      round(re_stats["ci_high"], 3) if re_stats else None,
+            "re_tau2":         round(re_stats["tau2"], 4) if re_stats else None,
+            "re_i2":           round(re_stats["i2"], 3) if re_stats else None,
+            "re_q_p":          round(re_stats["q_p"], 4) if re_stats else None,
+            "re_n_studies":    re_stats.get("n_studies") if re_stats else 0,
+            "high_heterogeneity": high_het,
             "per_dataset": [{
                 "dataset": s,
                 "logFC": round(dm[s]["logFC"], 3),
                 "rbc":   round(dm[s]["rbc"], 3) if dm[s]["rbc"] is not None else None,
                 "adj_p": round(dm[s]["adj_p"], 4) if dm[s]["adj_p"] is not None else None,
+                "se":    round(dm[s]["se"], 4) if dm[s].get("se") is not None else None,
             } for s in gene_sources],
         })
 
@@ -163,16 +268,26 @@ def cross_dataset_de(datasets, groupA=None, groupB=None, deg_datasets=None,
             entry["fisher_adj_p"] = round(float(adj_fisher[i]), 6)
         entries.sort(key=lambda x: (x["fisher_adj_p"], -x["avg_abs_logFC"]))
 
+    n_re_genes = sum(1 for e in entries if e.get("re_n_studies", 0) >= 2)
+    re_used = n_re_genes > 0
+
     return {
         "datasets_used": all_sources,
         "raw_datasets_used": used,
         "deg_datasets_used": deg_used,
         "comparison": f"{groupA} vs {groupB}",
-        "test": "Mann-Whitney U (per-dataset BH) + Fisher meta-analysis (global BH)",
+        "test": (
+            "Mann-Whitney U (per-dataset BH) + Fisher meta-analysis (global BH); "
+            "DerSimonian-Laird random-effects effect estimate per gene where ≥2 sources expose SE/CI"
+            if re_used else
+            "Mann-Whitney U (per-dataset BH) + Fisher meta-analysis (global BH)"
+        ),
         "n_consistent_genes": len(entries),
         "n_common_genes_tested": len(common),
         "n_filtered_by_directionality": n_directionally_inconsistent,
         "n_filtered_by_effect_size": n_below_effect_size,
+        "n_high_heterogeneity_genes": n_high_heterogeneity,
+        "n_re_genes": n_re_genes,
         "min_effect_size_used": min_effect_size,
         "top_consistent_up":   [{k: v for k, v in x.items() if k != "per_dataset"} for x in entries if x["direction"] == "UP"][:topN],
         "top_consistent_down": [{k: v for k, v in x.items() if k != "per_dataset"} for x in entries if x["direction"] == "DOWN"][:topN],

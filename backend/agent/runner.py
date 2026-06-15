@@ -175,19 +175,43 @@ def _write_report(
         lines.append("### Cross-Dataset Differential Expression\n")
         for de in seed_data["cross_de"]:
             lines.append(f"**{de['groupA']} vs {de['groupB']}** (genes tested: {de.get('n_tested', 'n/a')})\n")
-            if de.get("top_up"):
-                lines.append(f"_Consistently upregulated in {de['groupA']}:_")
-                lines.append("| Gene | avg|logFC| | fisher_adj_p | n_datasets |")
-                lines.append("|------|-----------|-------------|------------|")
-                for g in de["top_up"]:
-                    lines.append(f"| {g.get('gene','')} | {g.get('avg_abs_logFC','')} | {g.get('fisher_adj_p','')} | {g.get('n_datasets','')} |")
-                lines.append("")
-            if de.get("top_down"):
-                lines.append(f"_Consistently downregulated in {de['groupA']}:_")
-                lines.append("| Gene | avg|logFC| | fisher_adj_p | n_datasets |")
-                lines.append("|------|-----------|-------------|------------|")
-                for g in de["top_down"]:
-                    lines.append(f"| {g.get('gene','')} | {g.get('avg_abs_logFC','')} | {g.get('fisher_adj_p','')} | {g.get('n_datasets','')} |")
+            _all_top = (de.get("top_up") or []) + (de.get("top_down") or [])
+            _re_used = any(g.get("re_pooled_logFC") is not None for g in _all_top)
+            _high_het = sum(1 for g in _all_top if g.get("high_heterogeneity"))
+            if _re_used:
+                lines.append(
+                    "_Random-effects (DerSimonian-Laird) pooled logFC + I²/Cochran-Q reported "
+                    f"per gene. {_high_het} of {len(_all_top)} shown genes flagged high-heterogeneity (I²≥75%)._\n"
+                )
+            for label, key in (("upregulated", "top_up"), ("downregulated", "top_down")):
+                if not de.get(key):
+                    continue
+                lines.append(f"_Consistently {label} in {de['groupA']}:_")
+                if _re_used:
+                    lines.append("| Gene | avg|logFC| | RE pooled logFC | RE 95% CI | I² | Q p | fisher_adj_p | n_ds |")
+                    lines.append("|------|-----------|-----------------|-----------|-----|-----|-------------|------|")
+                    for g in de[key]:
+                        rfc = g.get("re_pooled_logFC")
+                        cil, cir = g.get("re_ci_low"), g.get("re_ci_high")
+                        i2 = g.get("re_i2")
+                        qp = g.get("re_q_p")
+                        het = " ⚠" if g.get("high_heterogeneity") else ""
+                        ci = f"[{cil}, {cir}]" if cil is not None else "—"
+                        lines.append(
+                            f"| {g.get('gene','')} | {g.get('avg_abs_logFC','')} | "
+                            f"{rfc if rfc is not None else '—'} | {ci} | "
+                            f"{i2 if i2 is not None else '—'}{het} | "
+                            f"{qp if qp is not None else '—'} | "
+                            f"{g.get('fisher_adj_p','')} | {g.get('n_datasets','')} |"
+                        )
+                else:
+                    lines.append("| Gene | avg|logFC| | fisher_adj_p | n_datasets |")
+                    lines.append("|------|-----------|-------------|------------|")
+                    for g in de[key]:
+                        lines.append(
+                            f"| {g.get('gene','')} | {g.get('avg_abs_logFC','')} | "
+                            f"{g.get('fisher_adj_p','')} | {g.get('n_datasets','')} |"
+                        )
                 lines.append("")
             if de.get("interpretation"):
                 lines.append(f"_{de['interpretation']}_\n")

@@ -228,6 +228,18 @@ async def upload_deg(
         if candidate in normed and "p" not in col_map:
             col_map["p"] = normed[candidate]
 
+    # Optional columns — drive the random-effects pooled estimate in
+    # cross_dataset_de when present. Missing columns are tolerated.
+    for candidate in ["se", "stderr", "std_err", "lfcse"]:
+        if candidate in normed and "se" not in col_map:
+            col_map["se"] = normed[candidate]
+    for candidate in ["ci_l", "cil"]:
+        if candidate in normed and "ci_l" not in col_map:
+            col_map["ci_l"] = normed[candidate]
+    for candidate in ["ci_r", "cir"]:
+        if candidate in normed and "ci_r" not in col_map:
+            col_map["ci_r"] = normed[candidate]
+
     missing = [k for k in ["gene", "logFC", "p", "adj_p"] if k not in col_map]
     if missing:
         raise HTTPException(
@@ -240,7 +252,11 @@ async def upload_deg(
 
     # Standardize
     df = raw.rename(columns={v: k for k, v in col_map.items()})
-    df = df[["gene", "logFC", "p", "adj_p"]].dropna()
+    keep_cols = ["gene", "logFC", "p", "adj_p"]
+    for opt in ("se", "ci_l", "ci_r"):
+        if opt in col_map:
+            keep_cols.append(opt)
+    df = df[keep_cols].dropna(subset=["gene", "logFC", "p", "adj_p"])
     df["gene"] = df["gene"].astype(str).str.strip().str.upper()
     df = df.set_index("gene")
 
