@@ -481,7 +481,7 @@ export default function App() {
                       });
                       if (r.ok) {
                         const data = await r.json();
-                        setLoaded(prev => prev.map(d => d.id === ds.id ? { ...d, group_col: newCol, groups: data.groups } : d));
+                        setLoaded(prev => prev.map(d => d.id === ds.id ? { ...d, group_col: newCol, groups: data.groups, group_counts: data.group_counts } : d));
                       }
                     } catch {}
                   }}>
@@ -492,7 +492,12 @@ export default function App() {
                   ))}
                 </select>
                 <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5, lineHeight: 1.9, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
-                  {ds.groups.map(g => <div key={g} style={{ paddingLeft: 2 }}>{g}</div>)}
+                  {ds.groups.map(g => (
+                    <div key={g} style={{ paddingLeft: 2, display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <span>{g}</span>
+                      {ds.group_counts?.[g] != null && <span style={{ color: t.textFaint }}>n={ds.group_counts[g]}</span>}
+                    </div>
+                  ))}
                 </div>
                 <div style={{ fontSize: 11, color: t.textMuted, marginTop: 4, opacity: 0.7 }}>
                   {ds.gene_count} genes · {ds.sample_count} samples

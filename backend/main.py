@@ -170,6 +170,7 @@ async def upload_dataset(
             and meta[c].dtype == object
         ],
         "groups": meta[gc].unique().tolist(),
+        "group_counts": {str(k): int(v) for k, v in meta[gc].value_counts().items()},
     }
 
 
@@ -380,7 +381,8 @@ async def update_group_col(dataset_id: str, body: dict):
         raise HTTPException(status_code=400, detail=f"Column {gc} not found")
     _datasets[dataset_id]["group_col"] = gc
     _datasets[dataset_id]["groups"] = meta[gc].unique().tolist()
-    return {"group_col": gc, "groups": meta[gc].unique().tolist()}
+    group_counts = {str(k): int(v) for k, v in meta[gc].value_counts().items()}
+    return {"group_col": gc, "groups": meta[gc].unique().tolist(), "group_counts": group_counts}
 
 
 @app.post("/api/group_mappings")
