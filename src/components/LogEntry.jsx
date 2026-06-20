@@ -1,24 +1,6 @@
 import { useState } from "react";
 import { verdictStyle } from "../theme";
 
-const ACTION_COLORS = {
-  dataset_summary:           "#94a3b8",
-  top_variable_genes:        "#60a5fa",
-  differential_expression:   "#f472b6",
-  gene_expression_by_group:  "#4ade80",
-  nonlinear_rule:            "#fb923c",
-  contextual_modules:        "#facc15",
-  pathway_enrichment:        "#a3e635",
-  batch_detection:           "#c084fc",
-  subgroup_discovery:        "#22d3ee",
-  gene_network_hub:          "#fbbf24",
-  cross_dataset_de:          "#34d399",
-  cross_dataset_correlation: "#38bdf8",
-  invariant_axis:            "#f59e0b",
-  cross_dataset_rewiring:    "#fb7185",
-  execute_code:              "#a78bfa",
-};
-
 function renderInline(text, t) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
@@ -49,7 +31,7 @@ function renderSummary(text, t) {
     if (line.startsWith("## ")) {
       flushList();
       elements.push(
-        <div key={i} style={{ fontSize: 11, fontWeight: 700, color: "#4ade80", letterSpacing: 1.2, textTransform: "uppercase", marginTop: elements.length === 0 ? 0 : 14, marginBottom: 6 }}>
+        <div key={i} style={{ fontSize: 11, fontWeight: 700, color: t.accent, letterSpacing: 1.2, textTransform: "uppercase", marginTop: elements.length === 0 ? 0 : 14, marginBottom: 6 }}>
           {line.slice(3)}
         </div>
       );
@@ -106,7 +88,7 @@ function renderResult(result, t) {
     return <pre style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", whiteSpace: "pre-wrap", margin: 0 }}>{String(result)}</pre>;
   }
   if (result.error) {
-    return <span style={{ fontSize: 12, color: "#f87171" }}>{result.error}</span>;
+    return <span style={{ fontSize: 12, color: t.warning }}>{result.error}</span>;
   }
 
   const scalars = [];
@@ -178,7 +160,6 @@ function renderThought(text, t) {
 
 export default function LogEntry({ entry, theme: t }) {
   const [expanded, setExpanded] = useState(true);
-  const ac = ACTION_COLORS[entry.action] || "#94a3b8";
   const isStep = entry.type === "thinking";
 
   return (
@@ -212,9 +193,9 @@ export default function LogEntry({ entry, theme: t }) {
           )}
 
           {entry.type === "result" && (
-            <div style={{ paddingLeft: 16, borderLeft: `2px solid ${ac}35` }}>
+            <div style={{ paddingLeft: 16, borderLeft: `2px solid ${t.accent}55` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-                <span className="tag" style={{ background: `${ac}15`, color: ac, fontWeight: 600, fontSize: 11, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", border: `1px solid ${ac}30` }}>
+                <span className="tag" style={{ background: t.surface2, color: t.textPrimary, fontWeight: 500, fontSize: 11, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", border: `1px solid ${t.border}` }}>
                   {entry.action}
                 </span>
                 <span style={{ fontSize: 13, color: t.textSecondary, flex: 1, lineHeight: 1.5 }}>{entry.summary}</span>
@@ -255,15 +236,15 @@ export default function LogEntry({ entry, theme: t }) {
           })()}
 
           {entry.type === "mode" && (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "4px 10px", background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 4, fontSize: 12, color: entry.mode === "reproduce" ? t.accent : "#c084fc", marginBottom: 4 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "4px 10px", background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 4, fontSize: 12, color: entry.mode === "reproduce" ? t.accent : t.uncertain, marginBottom: 4 }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor", opacity: 0.7, flexShrink: 0 }} />
               {entry.mode === "reproduce" ? "Reproduce — deterministic" : "Explore — creative"}
             </div>
           )}
 
           {entry.type === "seed" && (
-            <div style={{ padding: "12px 14px", background: t.cardBg, border: `1px solid ${t.border}`, borderLeft: "3px solid #60a5fa", borderRadius: 6 }}>
-              <div style={{ fontSize: 10, color: "#60a5fa", letterSpacing: 1.5, marginBottom: 8, fontWeight: 700, textTransform: "uppercase" }}>Pre-Analysis</div>
+            <div style={{ padding: "12px 14px", background: t.cardBg, border: `1px solid ${t.border}`, borderLeft: `3px solid ${t.accent}`, borderRadius: 8 }}>
+              <div style={{ fontSize: 10, color: t.accent, letterSpacing: 1.5, marginBottom: 8, fontWeight: 700, textTransform: "uppercase" }}>Pre-Analysis</div>
               {entry.summary
                 ? <div style={{ fontSize: 12, color: t.textSecondary, lineHeight: 1.75, whiteSpace: "pre-line" }}>{entry.summary}</div>
                 : <div style={{ fontSize: 12, color: t.textMuted }}>Pre-analysis produced no results — check that datasets are log-transformed and group columns are set correctly.</div>
@@ -272,25 +253,25 @@ export default function LogEntry({ entry, theme: t }) {
           )}
 
           {entry.type === "error" && (
-            <div style={{ fontSize: 13, color: "#f87171", padding: "6px 10px", background: "#f8717110", border: "1px solid #f8717125", borderRadius: 4 }}>
+            <div style={{ fontSize: 13, color: t.warning, padding: "6px 10px", background: t.warningSoft, border: `1px solid ${t.warning}40`, borderRadius: 6 }}>
               {entry.text}
             </div>
           )}
 
           {entry.type === "done" && !entry.exhausted && (
-            <div style={{ marginTop: 12, borderRadius: 8, overflow: "hidden", background: "#0d2818", border: "1px solid #4ade8025" }}>
-              <div style={{ padding: "10px 16px", background: "#0a2014", borderBottom: "1px solid #4ade8020", display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 14, lineHeight: 1, color: "#4ade80" }}>✓</span>
-                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#4ade80" }}>Analysis Complete</span>
+            <div style={{ marginTop: 12, borderRadius: 8, overflow: "hidden", background: t.confirmedSoft, border: `1px solid ${t.confirmedBd}` }}>
+              <div style={{ padding: "10px 16px", borderBottom: `1px solid ${t.confirmedBd}`, display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14, lineHeight: 1, color: t.confirmed }}>✓</span>
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: t.confirmed }}>Analysis Complete</span>
               </div>
               <div style={{ padding: "16px 20px" }}>
-                {renderSummary(entry.text, { ...t, textPrimary: "#dcfce7", textSecondary: "#86efac", accent: "#4ade80" })}
+                {renderSummary(entry.text, { ...t, accent: t.confirmed })}
               </div>
             </div>
           )}
 
           {entry.type === "done" && entry.exhausted && (
-            <div style={{ fontSize: 13, color: "#fbbf24", padding: "6px 10px", background: "#fbbf2410", border: "1px solid #fbbf2425", borderRadius: 4 }}>
+            <div style={{ fontSize: 13, color: t.uncertain, padding: "6px 10px", background: t.uncertainSoft, border: `1px solid ${t.uncertainBd}`, borderRadius: 6 }}>
               ⚠ {entry.text}
             </div>
           )}
