@@ -906,7 +906,7 @@ async def run_agent_loop(
 
         messages.append({"role": "user", "content": user_content})
 
-        yield {"type": "thinking", "text": f"Agent thinking... ({evaluated}/{max_hypotheses} hypotheses evaluated)"}
+        yield {"type": "thinking", "text": f"Agent thinking... ({evaluated}/{len(hypotheses)} hypotheses evaluated)"}
 
         # Apply prompt caching: clear all existing marks, then mark last 3 cacheable messages.
         # System prompt uses 1 of 4 allowed cache_control slots, leaving 3 for messages.
