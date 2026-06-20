@@ -4,7 +4,7 @@ import DatasetSlot from "./components/DatasetSlot";
 import LogEntry from "./components/LogEntry";
 import HypothesesPanel from "./components/HypothesesPanel";
 import { setGroupMappings, uploadDegDataset } from "./api";
-import { THEMES, FONT_SANS, RADII, SHADOW, cssVars } from "./theme";
+import { THEMES, FONT_SANS, RADII, SHADOW, cssVars, ACCENTS, applyAccent } from "./theme";
 
 function makeStyles(t) {
   return `
@@ -21,8 +21,13 @@ function makeStyles(t) {
   .thinking-indicator::after{content:'';animation:dots 1.2s steps(1) infinite}
   @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
   .spinner{width:14px;height:14px;border:2px solid ${t.border};border-top-color:${t.accent};border-radius:50%;animation:spin 0.75s linear infinite;flex-shrink:0}
+  @keyframes thb{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+  .thrb{display:inline-flex;align-items:flex-end;gap:2px;height:11px}
+  .thrb i{width:2px;height:100%;background:currentColor;border-radius:1px;transform-origin:bottom;animation:thb 1s ease-in-out infinite}
   .ent{animation:si .18s ease}
   .blink{animation:pulse 1.4s infinite}
+  .lockzone{border:0;margin:0;padding:0;min-width:0}
+  .lockzone:disabled{opacity:.55}
   .btn{
     background:${t.cardBg};border:1px solid ${t.border};color:${t.textPrimary};
     font-family:inherit;font-size:13px;padding:8px 14px;cursor:pointer;
@@ -64,9 +69,41 @@ function makeStyles(t) {
   `;
 }
 
+function SettingRow({ label, children }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-3)" }}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function Seg({ options, value, onChange, t }) {
+  return (
+    <div style={{ display: "flex", gap: 2, padding: 3, background: t.appBg, border: `1px solid ${t.border}`, borderRadius: RADII.md }}>
+      {options.map(({ k, l }) => (
+        <button key={k} onClick={() => onChange(k)}
+          style={{ flex: 1, padding: "5px 6px", fontSize: 11.5, fontFamily: "inherit", cursor: "pointer", borderRadius: RADII.sm,
+            background: value === k ? t.cardBg : "transparent",
+            border: value === k ? `1px solid ${t.accent}40` : "1px solid transparent",
+            color: value === k ? t.accent : t.textMuted, fontWeight: value === k ? 600 : 400 }}>
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
-  const [colorMode, setColorMode] = useState("dark");
-  const t = THEMES[colorMode];
+  const [colorMode, setColorMode] = useState(() => localStorage.getItem("ta_theme") || "dark");
+  const [accent,    setAccent]    = useState(() => localStorage.getItem("ta_accent") || "graphite");
+  const [density,   setDensity]   = useState(() => localStorage.getItem("ta_density") || "comfortable");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const t = applyAccent(THEMES[colorMode], colorMode, accent);
+
+  useEffect(() => { localStorage.setItem("ta_theme", colorMode); }, [colorMode]);
+  useEffect(() => { localStorage.setItem("ta_accent", accent); }, [accent]);
+  useEffect(() => { localStorage.setItem("ta_density", density); }, [density]);
 
   const [slots, setSlots] = useState([
     { id: 0, exprFile: null, metaFile: null, name: "Dataset 1" },
@@ -90,10 +127,27 @@ export default function App() {
   const [degUploading,  setDegUploading]  = useState(false);
   const [degStatus,     setDegStatus]     = useState("");
   const [runCost,       setRunCost]       = useState(null);
-  const logEnd   = useRef(null);
-  const abortRef = useRef(null);
+  const logEnd    = useRef(null);
+  const scrollRef = useRef(null);
+  const abortRef  = useRef(null);
+  const [atBottom, setAtBottom] = useState(true);
 
-  useEffect(() => { logEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [log]);
+  // Auto-scroll to the newest entry only while the user is pinned to the bottom,
+  // so reading back through the log isn't yanked away as new steps stream in.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && atBottom) el.scrollTop = el.scrollHeight;
+  }, [log, streamingText, currentStatus, atBottom]);
+
+  const onLogScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+  };
+  const jumpToLatest = () => {
+    const el = scrollRef.current;
+    if (el) { el.scrollTop = el.scrollHeight; setAtBottom(true); }
+  };
   const addLog = useCallback(e => setLog(prev => [...prev, { ...e, id: Date.now() + Math.random() }]), []);
 
   const addSlot    = () => setSlots(p => [...p, { id: Date.now(), exprFile: null, metaFile: null, name: `Dataset ${p.length + 1}` }]);
@@ -242,9 +296,10 @@ export default function App() {
   };
 
   const hasData = loaded.length > 0 || degDatasets.length > 0;
+  const locked = phase === "running";   // setup is read-only while a run is in flight
 
   return (
-    <div style={{ ...cssVars(colorMode), minHeight: "100vh", background: t.appBg, fontFamily: FONT_SANS, color: t.textPrimary }}>
+    <div style={{ ...cssVars(colorMode), "--accent": t.accent, "--accent-hover": t.accentHover, "--accent-soft": t.accentSoft, "--accent-text-on": t.accentTextOn, minHeight: "100vh", background: t.appBg, fontFamily: FONT_SANS, fontSize: density === "compact" ? 12.5 : 13.5, color: t.textPrimary }}>
       <style>{makeStyles(t)}</style>
 
       {/* Header */}
@@ -287,15 +342,39 @@ export default function App() {
             </span>
           </div>
         )}
-        <button
-          title={colorMode === "dark" ? "Switch to light" : "Switch to dark"}
-          onClick={() => setColorMode(m => m === "dark" ? "light" : "dark")}
-          style={{ height: 32, padding: "0 11px", display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${t.border}`, color: t.textSecondary, fontSize: 12, borderRadius: RADII.md, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}
-          onMouseEnter={e => { e.currentTarget.style.background = t.surface2; e.currentTarget.style.color = t.textPrimary; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.textSecondary; }}
-        >
-          {colorMode === "dark" ? "☀ Light" : "☾ Dark"}
-        </button>
+        <div style={{ position: "relative" }}>
+          <button
+            title="Settings"
+            onClick={() => setSettingsOpen(o => !o)}
+            style={{ height: 32, padding: "0 11px", display: "inline-flex", alignItems: "center", gap: 6, background: settingsOpen ? t.surface2 : "transparent", border: `1px solid ${t.border}`, color: settingsOpen ? t.textPrimary : t.textSecondary, fontSize: 12, borderRadius: RADII.md, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}
+            onMouseEnter={e => { e.currentTarget.style.background = t.surface2; e.currentTarget.style.color = t.textPrimary; }}
+            onMouseLeave={e => { if (!settingsOpen) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.textSecondary; } }}
+          >
+            ⚙ Settings
+          </button>
+
+          {settingsOpen && (
+            <>
+              <div onClick={() => setSettingsOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div style={{ position: "absolute", top: 40, right: 0, zIndex: 41, width: 232, padding: 14, background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: RADII.lg, boxShadow: SHADOW[colorMode].lg, display: "flex", flexDirection: "column", gap: 14 }}>
+                <SettingRow label="Theme">
+                  <Seg options={[{ k: "light", l: "Light" }, { k: "dark", l: "Dark" }]} value={colorMode} onChange={setColorMode} t={t} />
+                </SettingRow>
+                <SettingRow label="Accent">
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {Object.entries(ACCENTS).map(([key, a]) => (
+                      <button key={key} title={a.label} onClick={() => setAccent(key)}
+                        style={{ width: 30, height: 30, borderRadius: 8, background: a.swatch, cursor: "pointer", padding: 0, border: accent === key ? `2px solid ${t.textPrimary}` : `2px solid transparent`, boxShadow: accent === key ? `0 0 0 2px ${t.cardBg} inset` : "none" }} />
+                    ))}
+                  </div>
+                </SettingRow>
+                <SettingRow label="Density">
+                  <Seg options={[{ k: "compact", l: "Compact" }, { k: "comfortable", l: "Comfortable" }]} value={density} onChange={setDensity} t={t} />
+                </SettingRow>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div style={{ display: "flex", height: "calc(100vh - 52px)" }}>
@@ -303,6 +382,13 @@ export default function App() {
         {/* LEFT PANEL */}
         <div style={{ width: 288, borderRight: `1px solid ${t.border}`, padding: "8px 14px 14px", overflowY: "auto", flexShrink: 0, background: t.sidebarBg }}>
 
+          {locked && (
+            <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "4px 0 10px", padding: "6px 10px", fontSize: 11.5, color: t.textSecondary, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: RADII.sm }}>
+              <span style={{ fontSize: 12 }}>🔒</span> Setup locked while the run is in flight
+            </div>
+          )}
+
+          <fieldset className="lockzone" disabled={locked}>
           <div className="sec">Datasets</div>
 
           {slots.map(slot => (
@@ -353,7 +439,10 @@ export default function App() {
             ))}
           </div>
 
+          </fieldset>
+
           {hasData && <>
+            <fieldset className="lockzone" disabled={locked}>
             <div className="sec">Group Columns</div>
             {loaded.map(ds => (
               <div key={ds.id} style={{ marginBottom: 14 }}>
@@ -465,6 +554,7 @@ export default function App() {
             <input type="number" value={maxHypotheses} min={1} max={30}
               onChange={e => setMaxHypotheses(parseInt(e.target.value))}
               style={{ marginBottom: 14 }} />
+            </fieldset>
 
             <button
               style={{
@@ -484,17 +574,27 @@ export default function App() {
         </div>
 
         {/* LOG PANEL */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
 
           {currentStatus && (
             <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "9px 24px", borderBottom: `1px solid ${t.border}`, background: t.sidebarBg }}>
               <div className="spinner" />
               <span className="thinking-indicator" style={{ fontSize: 13, color: t.accent }}>{currentStatus}</span>
-              {hypotheses.length > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: t.textMuted }}>{hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} evaluated</span>}
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 16 }}>
+                {phase === "running" && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: t.textMuted }}>
+                    <span className="thrb" style={{ color: t.accent }}>
+                      <i style={{ animationDelay: "0s" }} /><i style={{ animationDelay: ".15s" }} /><i style={{ animationDelay: ".3s" }} /><i style={{ animationDelay: ".45s" }} />
+                    </span>
+                    streaming
+                  </span>
+                )}
+                {hypotheses.length > 0 && <span style={{ fontSize: 12, color: t.textMuted }}>{hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} evaluated</span>}
+              </div>
             </div>
           )}
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+          <div ref={scrollRef} onScroll={onLogScroll} style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
             {log.length === 0 && !currentStatus && (
               <div style={{ textAlign: "center", marginTop: "26vh" }}>
                 <div style={{ width: 52, height: 52, margin: "0 auto 20px", background: `${t.accent}10`, border: `1px solid ${t.accent}20`, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: `${t.accent}50` }}>◈</div>
@@ -521,6 +621,15 @@ export default function App() {
             )}
             <div ref={logEnd} />
           </div>
+
+          {!atBottom && log.length > 0 && (
+            <button
+              onClick={jumpToLatest}
+              style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: 16, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 13px", fontSize: 12, fontWeight: 500, color: t.accentTextOn, background: t.accent, border: "none", borderRadius: 99, cursor: "pointer", fontFamily: "inherit", boxShadow: SHADOW[colorMode].md, zIndex: 5 }}
+            >
+              ↓ Jump to latest
+            </button>
+          )}
         </div>
 
         {/* HYPOTHESIS PANEL */}

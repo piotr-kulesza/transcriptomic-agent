@@ -227,11 +227,32 @@ const RIGOR = [
   { v: "null", k: "Permutation-calibrated gate" },
 ];
 
+const SORT_RANK = { confirmed: 0, uncertain: 1, rejected: 2, testing: 3, pending: 4 };
+const FILTER_CHIPS = [
+  { k: "all",       glyph: "",  label: "All" },
+  { k: "confirmed", glyph: "✓", label: "Confirmed" },
+  { k: "uncertain", glyph: "?", label: "Uncertain" },
+  { k: "rejected",  glyph: "–", label: "Rejected" },
+  { k: "pending",   glyph: "○", label: "Pending" },
+];
+
 export default function HypothesesPanel({ hypotheses, maxHypotheses, theme: t }) {
   const [expanded, setExpanded] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("id");
   const onToggle = (id) => setExpanded((cur) => (cur === id ? null : id));
   const cards = hypotheses.map(buildCard);
   const settled = cards.filter((c) => ["confirmed", "uncertain", "rejected"].includes(c.state)).length;
+
+  const counts = cards.reduce((m, c) => ((m[c.state] = (m[c.state] || 0) + 1), m), {});
+  const byId = (a, b) => a.id.localeCompare(b.id, undefined, { numeric: true });
+  const filtered = filter === "all" ? cards : cards.filter((c) => c.state === filter);
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === "verdict") return (SORT_RANK[a.state] - SORT_RANK[b.state]) || byId(a, b);
+    if (sortBy === "evidence") return (b.evidenceCount - a.evidenceCount) || byId(a, b);
+    return byId(a, b);
+  });
+  const chipColor = (k) => (k === "all" ? t.textSecondary : badgeColors(k, t).color);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -242,9 +263,34 @@ export default function HypothesesPanel({ hypotheses, maxHypotheses, theme: t })
         </span>
       </div>
 
+      {cards.length > 0 && (
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderBottom: `1px solid ${t.border}`, flexWrap: "wrap" }}>
+          {FILTER_CHIPS.filter((c) => c.k === "all" || counts[c.k]).map((c) => {
+            const active = filter === c.k;
+            const n = c.k === "all" ? cards.length : counts[c.k];
+            const col = chipColor(c.k);
+            return (
+              <button key={c.k} onClick={() => setFilter(c.k)} title={c.label}
+                style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "2px 7px", fontSize: 11, fontFamily: FONT_MONO, cursor: "pointer", borderRadius: 99,
+                  background: active ? `${col}1f` : "transparent", color: active ? col : t.textMuted,
+                  border: `1px solid ${active ? `${col}55` : t.border}` }}>
+                {c.glyph && <span>{c.glyph}</span>}{c.glyph ? n : `${c.label} ${n}`}
+              </button>
+            );
+          })}
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
+            style={{ marginLeft: "auto", width: "auto", fontSize: 11, padding: "3px 6px", color: t.textSecondary }}>
+            <option value="id">Sort: ID</option>
+            <option value="verdict">Sort: Verdict</option>
+            <option value="evidence">Sort: Evidence</option>
+          </select>
+        </div>
+      )}
+
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
         {cards.length === 0 && <div style={{ fontSize: 13, color: t.textMuted }}>Formulating hypotheses…</div>}
-        {cards.map((card) => (
+        {cards.length > 0 && sorted.length === 0 && <div style={{ fontSize: 12, color: t.textMuted }}>No {filter} hypotheses.</div>}
+        {sorted.map((card) => (
           <HypCard key={card.id} card={card} expanded={expanded === card.id} onToggle={onToggle} t={t} />
         ))}
       </div>

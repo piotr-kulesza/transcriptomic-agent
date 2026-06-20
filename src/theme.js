@@ -16,6 +16,39 @@ export const FONT_MONO = "'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,mono
 
 export const RADII = { sm: 5, md: 8, lg: 11, xl: 14 };
 
+/* Accent presets — user-selectable in Settings. Each overrides only the
+   accent-family tokens (accent / hover / soft / text-on / start-hover) on top
+   of the active light|dark theme, so the rest of the palette is unchanged.
+   "graphite" mirrors the THEMES defaults below. swatch is for the picker UI. */
+export const ACCENTS = {
+  graphite: {
+    label: "Graphite", swatch: "#6b7785",
+    light: { accent: "#4f5964", accentHover: "#3c4651", accentSoft: "#e6f0fa", accentTextOn: "#fcfcfd", startHoverBg: "#e6f0fa" },
+    dark:  { accent: "#97a7b8", accentHover: "#acbdce", accentSoft: "#242f3b", accentTextOn: "#15171a", startHoverBg: "#242f3b" },
+  },
+  slate: {
+    label: "Slate", swatch: "#3b6fb0",
+    light: { accent: "#3b6fb0", accentHover: "#2f5b92", accentSoft: "#e6eef9", accentTextOn: "#ffffff", startHoverBg: "#e6eef9" },
+    dark:  { accent: "#6f9fd8", accentHover: "#88b2e4", accentSoft: "#1c2a3b", accentTextOn: "#0c1116", startHoverBg: "#1c2a3b" },
+  },
+  teal: {
+    label: "Teal", swatch: "#1f8a7a",
+    light: { accent: "#1f8a7a", accentHover: "#176c60", accentSoft: "#e0f3ef", accentTextOn: "#ffffff", startHoverBg: "#e0f3ef" },
+    dark:  { accent: "#4fc4ae", accentHover: "#6fd4c0", accentSoft: "#0e2f2a", accentTextOn: "#08110f", startHoverBg: "#0e2f2a" },
+  },
+  indigo: {
+    label: "Indigo", swatch: "#5a57d6",
+    light: { accent: "#5a57d6", accentHover: "#4744bb", accentSoft: "#ebebfb", accentTextOn: "#ffffff", startHoverBg: "#ebebfb" },
+    dark:  { accent: "#9a97ec", accentHover: "#b0adf2", accentSoft: "#25243f", accentTextOn: "#100f1c", startHoverBg: "#25243f" },
+  },
+};
+
+/* Merge an accent preset's tokens onto the base theme for the given mode. */
+export function applyAccent(base, mode, accentKey) {
+  const a = (ACCENTS[accentKey] || ACCENTS.graphite)[mode];
+  return { ...base, ...a };
+}
+
 export const SHADOW = {
   light: {
     sm: "0 1px 2px rgba(70,80,95,.06), 0 1px 1px rgba(70,80,95,.04)",
