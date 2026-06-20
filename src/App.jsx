@@ -21,6 +21,9 @@ function makeStyles(t) {
   .thinking-indicator::after{content:'';animation:dots 1.2s steps(1) infinite}
   @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
   .spinner{width:14px;height:14px;border:2px solid ${t.border};border-top-color:${t.accent};border-radius:50%;animation:spin 0.75s linear infinite;flex-shrink:0}
+  @keyframes thb{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+  .thrb{display:inline-flex;align-items:flex-end;gap:2px;height:11px}
+  .thrb i{width:2px;height:100%;background:currentColor;border-radius:1px;transform-origin:bottom;animation:thb 1s ease-in-out infinite}
   .ent{animation:si .18s ease}
   .blink{animation:pulse 1.4s infinite}
   .btn{
@@ -507,7 +510,17 @@ export default function App() {
             <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "9px 24px", borderBottom: `1px solid ${t.border}`, background: t.sidebarBg }}>
               <div className="spinner" />
               <span className="thinking-indicator" style={{ fontSize: 13, color: t.accent }}>{currentStatus}</span>
-              {hypotheses.length > 0 && <span style={{ marginLeft: "auto", fontSize: 12, color: t.textMuted }}>{hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} evaluated</span>}
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 16 }}>
+                {phase === "running" && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: t.textMuted }}>
+                    <span className="thrb" style={{ color: t.accent }}>
+                      <i style={{ animationDelay: "0s" }} /><i style={{ animationDelay: ".15s" }} /><i style={{ animationDelay: ".3s" }} /><i style={{ animationDelay: ".45s" }} />
+                    </span>
+                    streaming
+                  </span>
+                )}
+                {hypotheses.length > 0 && <span style={{ fontSize: 12, color: t.textMuted }}>{hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} evaluated</span>}
+              </div>
             </div>
           )}
 
