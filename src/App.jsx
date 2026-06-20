@@ -328,10 +328,10 @@ export default function App() {
               {degUploading ? "Uploading..." : "Upload DEG table"}
             </button>
             {degStatus && (
-              <div style={{ fontSize: 12, marginBottom: 8, padding: "5px 9px", borderRadius: 5,
-                color: degStatus.startsWith("Error") ? "#f87171" : "#4ade80",
-                background: degStatus.startsWith("Error") ? (colorMode === "dark" ? "#2d0c0c" : "#fef2f2") : (colorMode === "dark" ? "#0a1f12" : "#f0fdf4"),
-                border: `1px solid ${degStatus.startsWith("Error") ? "#6e202044" : "#4ade8030"}` }}>
+              <div style={{ fontSize: 12, marginBottom: 8, padding: "5px 9px", borderRadius: RADII.sm,
+                color: degStatus.startsWith("Error") ? t.warning : t.confirmed,
+                background: degStatus.startsWith("Error") ? t.warningSoft : t.confirmedSoft,
+                border: `1px solid ${degStatus.startsWith("Error") ? `${t.warning}40` : t.confirmedBd}` }}>
                 {degStatus}
               </div>
             )}
