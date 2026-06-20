@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import DatasetSlot from "./components/DatasetSlot";
 import LogEntry from "./components/LogEntry";
 import HypothesesPanel from "./components/HypothesesPanel";
+import CoverageDock from "./components/CoverageDock";
 import { setGroupMappings, uploadDegDataset } from "./api";
 import { THEMES, FONT_SANS, RADII, SHADOW, cssVars, ACCENTS, applyAccent } from "./theme";
 
@@ -630,6 +631,8 @@ export default function App() {
               ↓ Jump to latest
             </button>
           )}
+
+          {(phase === "running" || hypotheses.length > 0) && <CoverageDock hypotheses={hypotheses} theme={t} />}
         </div>
 
         {/* HYPOTHESIS PANEL */}
