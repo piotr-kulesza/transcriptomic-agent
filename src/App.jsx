@@ -4,6 +4,7 @@ import DatasetSlot from "./components/DatasetSlot";
 import LogEntry from "./components/LogEntry";
 import HypothesesPanel from "./components/HypothesesPanel";
 import CoverageDock from "./components/CoverageDock";
+import ReportDrawer from "./components/ReportDrawer";
 import { setGroupMappings, uploadDegDataset } from "./api";
 import { THEMES, FONT_SANS, RADII, SHADOW, cssVars, ACCENTS, applyAccent } from "./theme";
 
@@ -100,6 +101,7 @@ export default function App() {
   const [accent,    setAccent]    = useState(() => localStorage.getItem("ta_accent") || "graphite");
   const [density,   setDensity]   = useState(() => localStorage.getItem("ta_density") || "comfortable");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const t = applyAccent(THEMES[colorMode], colorMode, accent);
 
   useEffect(() => { localStorage.setItem("ta_theme", colorMode); }, [colorMode]);
@@ -342,6 +344,17 @@ export default function App() {
               {runCost < 0.01 ? runCost.toFixed(4) : runCost.toFixed(3)}
             </span>
           </div>
+        )}
+        {hypotheses.length > 0 && (
+          <button
+            title="Open findings report"
+            onClick={() => setReportOpen(true)}
+            style={{ height: 32, padding: "0 11px", display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${t.accent}40`, color: t.accent, fontSize: 12, borderRadius: RADII.md, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}
+            onMouseEnter={e => { e.currentTarget.style.background = t.startHoverBg; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+          >
+            📄 Report
+          </button>
         )}
         <div style={{ position: "relative" }}>
           <button
@@ -642,6 +655,10 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {reportOpen && (
+        <ReportDrawer hypotheses={hypotheses} datasets={loaded} colorMode={colorMode} theme={t} onClose={() => setReportOpen(false)} />
+      )}
     </div>
   );
 }
