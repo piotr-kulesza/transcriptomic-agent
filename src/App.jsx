@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
 import DatasetSlot from "./components/DatasetSlot";
 import LogEntry from "./components/LogEntry";
+import HypothesesPanel from "./components/HypothesesPanel";
 import { setGroupMappings, uploadDegDataset } from "./api";
-import { THEMES, FONT_SANS, RADII, SHADOW, verdictStyle, cssVars } from "./theme";
+import { THEMES, FONT_SANS, RADII, SHADOW, cssVars } from "./theme";
 
 function makeStyles(t) {
   return `
@@ -524,44 +525,8 @@ export default function App() {
 
         {/* HYPOTHESIS PANEL */}
         {(phase === "running" || hypotheses.length > 0) && (
-          <div style={{ width: 276, borderLeft: `1px solid ${t.border}`, padding: "8px 14px 14px", overflowY: "auto", flexShrink: 0, background: t.sidebarBg }}>
-            <div className="sec">Hypotheses</div>
-            {hypotheses.length === 0 && (
-              <div style={{ fontSize: 13, color: t.textMuted }}>Formulating hypotheses...</div>
-            )}
-            {hypotheses.map(h => {
-              const vs = verdictStyle(t, h.status);
-              return (
-                <div key={h.id} style={{ marginBottom: 10, padding: "10px 12px", background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 7, borderLeft: `3px solid ${vs.color}55` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
-                    <span className="tag" style={{ background: `${vs.color}15`, color: vs.color, fontSize: 11, border: `1px solid ${vs.color}30` }}>{h.id}</span>
-                    <span style={{ fontSize: 11, color: vs.color, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase" }}>{vs.icon} {h.status}</span>
-                  </div>
-                  <div style={{ fontSize: 13, color: t.textPrimary, lineHeight: 1.65 }}>{h.text}</div>
-                  {h.evidence.length > 0 && (
-                    <div style={{ marginTop: 9, borderTop: `1px solid ${t.border}`, paddingTop: 9 }}>
-                      {h.evidence.map((ev, i) => (
-                        <div key={i} style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.6, marginBottom: 5 }}>
-                          <span style={{ color: t.textSecondary }}>step {ev.step} [{ev.action}]</span> {ev.reasoning}
-                          {ev.key_stats && Object.keys(ev.key_stats).length > 0 && (
-                            <div style={{ marginTop: 3, paddingLeft: 8, borderLeft: `2px solid ${t.border}`, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
-                              {Object.entries(ev.key_stats).map(([gene, s]) => (
-                                <span key={gene} style={{ display: "inline-block", marginRight: 10, color: t.textMuted, fontSize: 11 }}>
-                                  <b style={{ color: t.textSecondary }}>{gene}</b>{": "}
-                                  {Object.entries(s).filter(([, v]) => v != null).map(([k, v]) =>
-                                    `${k}=${typeof v === "number" ? (Math.abs(v) < 0.001 ? v.toExponential(2) : v.toPrecision(3)) : Array.isArray(v) ? v.join(",") : v}`
-                                  ).join("  ")}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div style={{ width: 300, borderLeft: `1px solid ${t.border}`, flexShrink: 0, background: t.sidebarBg }}>
+            <HypothesesPanel hypotheses={hypotheses} maxHypotheses={maxHypotheses} theme={t} />
           </div>
         )}
       </div>
