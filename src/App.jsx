@@ -26,6 +26,8 @@ function makeStyles(t) {
   .thrb i{width:2px;height:100%;background:currentColor;border-radius:1px;transform-origin:bottom;animation:thb 1s ease-in-out infinite}
   .ent{animation:si .18s ease}
   .blink{animation:pulse 1.4s infinite}
+  .lockzone{border:0;margin:0;padding:0;min-width:0}
+  .lockzone:disabled{opacity:.55}
   .btn{
     background:${t.cardBg};border:1px solid ${t.border};color:${t.textPrimary};
     font-family:inherit;font-size:13px;padding:8px 14px;cursor:pointer;
@@ -262,6 +264,7 @@ export default function App() {
   };
 
   const hasData = loaded.length > 0 || degDatasets.length > 0;
+  const locked = phase === "running";   // setup is read-only while a run is in flight
 
   return (
     <div style={{ ...cssVars(colorMode), minHeight: "100vh", background: t.appBg, fontFamily: FONT_SANS, color: t.textPrimary }}>
@@ -323,6 +326,13 @@ export default function App() {
         {/* LEFT PANEL */}
         <div style={{ width: 288, borderRight: `1px solid ${t.border}`, padding: "8px 14px 14px", overflowY: "auto", flexShrink: 0, background: t.sidebarBg }}>
 
+          {locked && (
+            <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "4px 0 10px", padding: "6px 10px", fontSize: 11.5, color: t.textSecondary, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: RADII.sm }}>
+              <span style={{ fontSize: 12 }}>🔒</span> Setup locked while the run is in flight
+            </div>
+          )}
+
+          <fieldset className="lockzone" disabled={locked}>
           <div className="sec">Datasets</div>
 
           {slots.map(slot => (
@@ -373,7 +383,10 @@ export default function App() {
             ))}
           </div>
 
+          </fieldset>
+
           {hasData && <>
+            <fieldset className="lockzone" disabled={locked}>
             <div className="sec">Group Columns</div>
             {loaded.map(ds => (
               <div key={ds.id} style={{ marginBottom: 14 }}>
@@ -485,6 +498,7 @@ export default function App() {
             <input type="number" value={maxHypotheses} min={1} max={30}
               onChange={e => setMaxHypotheses(parseInt(e.target.value))}
               style={{ marginBottom: 14 }} />
+            </fieldset>
 
             <button
               style={{
