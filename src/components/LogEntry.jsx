@@ -1,6 +1,28 @@
 import { useState } from "react";
 import { verdictStyle } from "../theme";
 
+// Heuristic stream phase from the tool action — purely client-side labelling of
+// what kind of work a step is (the live stream has no explicit phase field).
+const PHASE_BY_ACTION = {
+  dataset_summary: "Ingest", top_variable_genes: "Explore", batch_detection: "Setup",
+  differential_expression: "Test", gene_expression_by_group: "Test", pathway_enrichment: "Test",
+  gsea_enrichment: "Test", meta_gsea: "Test", subgroup_discovery: "Test", gene_network_hub: "Test",
+  nonlinear_rule: "Test", contextual_modules: "Test", one_vs_rest: "Test",
+  cross_dataset_de: "Replicate", cross_dataset_correlation: "Replicate", cross_dataset_rewiring: "Replicate",
+  invariant_axis: "Replicate", network_meta_analysis: "Replicate", deg_voting: "Replicate",
+  deg_biomarker_ranking: "Replicate", deg_cooccurrence_network: "Replicate", deg_direction_comparison: "Replicate",
+  execute_code: "Custom",
+};
+const phaseFor = (action) => PHASE_BY_ACTION[action] || "Test";
+
+function PhaseChip({ phase, t }) {
+  return (
+    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMuted, background: t.surface3 || t.surface2, border: `1px solid ${t.border}`, borderRadius: 99, padding: "1px 7px" }}>
+      {phase}
+    </span>
+  );
+}
+
 function renderInline(text, t) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
@@ -195,6 +217,7 @@ export default function LogEntry({ entry, theme: t }) {
           {entry.type === "result" && (
             <div style={{ paddingLeft: 16, borderLeft: `2px solid ${t.accent}55` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                <PhaseChip phase={phaseFor(entry.action)} t={t} />
                 <span className="tag" style={{ background: t.surface2, color: t.textPrimary, fontWeight: 500, fontSize: 11, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", border: `1px solid ${t.border}` }}>
                   {entry.action}
                 </span>
@@ -223,6 +246,7 @@ export default function LogEntry({ entry, theme: t }) {
             return (
               <div style={{ padding: "10px 14px", background: t.cardBg, border: `1px solid ${vs.color}22`, borderLeft: `3px solid ${vs.color}`, borderRadius: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: entry.reasoning ? 6 : 0 }}>
+                  <PhaseChip phase="Gate" t={t} />
                   <span className="tag" style={{ background: `${vs.color}15`, color: vs.color, fontSize: 11, border: `1px solid ${vs.color}30` }}>
                     {entry.hypothesis.id}
                   </span>

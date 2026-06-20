@@ -3,6 +3,8 @@ import { flushSync } from "react-dom";
 import DatasetSlot from "./components/DatasetSlot";
 import LogEntry from "./components/LogEntry";
 import HypothesesPanel from "./components/HypothesesPanel";
+import CoverageDock from "./components/CoverageDock";
+import ReportDrawer from "./components/ReportDrawer";
 import { setGroupMappings, uploadDegDataset } from "./api";
 import { THEMES, FONT_SANS, RADII, SHADOW, cssVars, ACCENTS, applyAccent } from "./theme";
 
@@ -99,6 +101,7 @@ export default function App() {
   const [accent,    setAccent]    = useState(() => localStorage.getItem("ta_accent") || "graphite");
   const [density,   setDensity]   = useState(() => localStorage.getItem("ta_density") || "comfortable");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const t = applyAccent(THEMES[colorMode], colorMode, accent);
 
   useEffect(() => { localStorage.setItem("ta_theme", colorMode); }, [colorMode]);
@@ -116,6 +119,7 @@ export default function App() {
   const [step,          setStep]          = useState(0);
   const [maxHypotheses, setMaxHypotheses] = useState(3);
   const [agentMode,     setAgentMode]     = useState("reproduce");
+  const [piModel,       setPiModel]       = useState("claude-opus-4-8");
   const [currentStatus, setCurrentStatus] = useState("");
   const [streamingText, setStreamingText] = useState("");
   const [mappingGroups, setMappingGroups] = useState([]);
@@ -127,6 +131,7 @@ export default function App() {
   const [degUploading,  setDegUploading]  = useState(false);
   const [degStatus,     setDegStatus]     = useState("");
   const [runCost,       setRunCost]       = useState(null);
+  const [priorCount,    setPriorCount]    = useState(0);
   const logEnd    = useRef(null);
   const scrollRef = useRef(null);
   const abortRef  = useRef(null);
@@ -240,7 +245,7 @@ export default function App() {
 
   const runAgent = async () => {
     if (!loaded.length && !degDatasets.length) return;
-    setPhase("running"); setLog([]); setStep(0); setHypotheses([]); setCurrentStatus("Running pre-analysis..."); setStreamingText(""); setRunCost(0);
+    setPhase("running"); setLog([]); setStep(0); setHypotheses([]); setCurrentStatus("Running pre-analysis..."); setStreamingText(""); setRunCost(0); setPriorCount(0);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -250,7 +255,7 @@ export default function App() {
       const res = await fetch("http://localhost:8000/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataset_ids: loaded.map(d => d.id), group_cols: groupMap, max_hypotheses: maxHypotheses, mode: agentMode }),
+        body: JSON.stringify({ dataset_ids: loaded.map(d => d.id), group_cols: groupMap, max_hypotheses: maxHypotheses, mode: agentMode, model: piModel }),
         signal: controller.signal,
       });
 
@@ -280,6 +285,7 @@ export default function App() {
             if (entry.type === "thought_stream") { flushSync(() => setStreamingText(prev => prev + entry.delta)); continue; }
             if (entry.type === "thought")        { flushSync(() => setStreamingText("")); }
             if (entry.type === "usage")          { setRunCost(entry.total_cost_usd); continue; }
+            if (entry.type === "prior_knowledge") { setPriorCount(entry.count || 0); continue; }
             if (entry.type === "hypothesis_propose") setHypotheses(prev => [...prev, entry.hypothesis]);
             if (entry.type === "hypothesis_eval")    setHypotheses(prev => prev.map(h => h.id === entry.hypothesis.id ? entry.hypothesis : h));
             addLog(entry);
@@ -334,13 +340,30 @@ export default function App() {
 
         <div style={{ flex: 1 }} />
 
+        {priorCount > 0 && (
+          <div title="Confirmed findings recalled from prior runs on this data" style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 11px", fontSize: 12, color: t.textSecondary, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 99 }}>
+            <span style={{ fontSize: 12 }}>🧠</span>
+            Remembers <b style={{ color: t.textPrimary, fontWeight: 600 }}>{priorCount}</b> prior finding{priorCount === 1 ? "" : "s"}
+          </div>
+        )}
         {runCost !== null && (
-          <div title="Estimated API cost (claude-sonnet-4-6)" style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 11px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 99 }}>
+          <div title={`Estimated API cost (${piModel})`} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 11px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 99 }}>
             <span style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>$</span>
             <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", fontWeight: 500 }}>
               {runCost < 0.01 ? runCost.toFixed(4) : runCost.toFixed(3)}
             </span>
           </div>
+        )}
+        {hypotheses.length > 0 && (
+          <button
+            title="Open findings report"
+            onClick={() => setReportOpen(true)}
+            style={{ height: 32, padding: "0 11px", display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${t.accent}40`, color: t.accent, fontSize: 12, borderRadius: RADII.md, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}
+            onMouseEnter={e => { e.currentTarget.style.background = t.startHoverBg; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+          >
+            📄 Report
+          </button>
         )}
         <div style={{ position: "relative" }}>
           <button
@@ -458,7 +481,7 @@ export default function App() {
                       });
                       if (r.ok) {
                         const data = await r.json();
-                        setLoaded(prev => prev.map(d => d.id === ds.id ? { ...d, group_col: newCol, groups: data.groups } : d));
+                        setLoaded(prev => prev.map(d => d.id === ds.id ? { ...d, group_col: newCol, groups: data.groups, group_counts: data.group_counts } : d));
                       }
                     } catch {}
                   }}>
@@ -469,7 +492,12 @@ export default function App() {
                   ))}
                 </select>
                 <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5, lineHeight: 1.9, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
-                  {ds.groups.map(g => <div key={g} style={{ paddingLeft: 2 }}>{g}</div>)}
+                  {ds.groups.map(g => (
+                    <div key={g} style={{ paddingLeft: 2, display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <span>{g}</span>
+                      {ds.group_counts?.[g] != null && <span style={{ color: t.textFaint }}>n={ds.group_counts[g]}</span>}
+                    </div>
+                  ))}
                 </div>
                 <div style={{ fontSize: 11, color: t.textMuted, marginTop: 4, opacity: 0.7 }}>
                   {ds.gene_count} genes · {ds.sample_count} samples
@@ -549,6 +577,13 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            <div className="sec">PI Model</div>
+            <select value={piModel} onChange={e => setPiModel(e.target.value)} style={{ marginBottom: 12 }}>
+              <option value="claude-opus-4-8">Claude Opus 4.8 — most capable</option>
+              <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — balanced</option>
+              <option value="claude-haiku-4-5">Claude Haiku 4.5 — fast & cheap</option>
+            </select>
 
             <div className="sec">Hypotheses to test</div>
             <input type="number" value={maxHypotheses} min={1} max={30}
@@ -630,6 +665,8 @@ export default function App() {
               ↓ Jump to latest
             </button>
           )}
+
+          {(phase === "running" || hypotheses.length > 0) && <CoverageDock hypotheses={hypotheses} theme={t} />}
         </div>
 
         {/* HYPOTHESIS PANEL */}
@@ -639,6 +676,10 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {reportOpen && (
+        <ReportDrawer hypotheses={hypotheses} datasets={loaded} colorMode={colorMode} theme={t} onClose={() => setReportOpen(false)} />
+      )}
     </div>
   );
 }
