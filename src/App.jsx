@@ -4,7 +4,7 @@ import DatasetSlot from "./components/DatasetSlot";
 import LogEntry from "./components/LogEntry";
 import HypothesesPanel from "./components/HypothesesPanel";
 import { setGroupMappings, uploadDegDataset } from "./api";
-import { THEMES, FONT_SANS, RADII, SHADOW, cssVars } from "./theme";
+import { THEMES, FONT_SANS, RADII, SHADOW, cssVars, ACCENTS, applyAccent } from "./theme";
 
 function makeStyles(t) {
   return `
@@ -69,9 +69,41 @@ function makeStyles(t) {
   `;
 }
 
+function SettingRow({ label, children }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-3)" }}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function Seg({ options, value, onChange, t }) {
+  return (
+    <div style={{ display: "flex", gap: 2, padding: 3, background: t.appBg, border: `1px solid ${t.border}`, borderRadius: RADII.md }}>
+      {options.map(({ k, l }) => (
+        <button key={k} onClick={() => onChange(k)}
+          style={{ flex: 1, padding: "5px 6px", fontSize: 11.5, fontFamily: "inherit", cursor: "pointer", borderRadius: RADII.sm,
+            background: value === k ? t.cardBg : "transparent",
+            border: value === k ? `1px solid ${t.accent}40` : "1px solid transparent",
+            color: value === k ? t.accent : t.textMuted, fontWeight: value === k ? 600 : 400 }}>
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
-  const [colorMode, setColorMode] = useState("dark");
-  const t = THEMES[colorMode];
+  const [colorMode, setColorMode] = useState(() => localStorage.getItem("ta_theme") || "dark");
+  const [accent,    setAccent]    = useState(() => localStorage.getItem("ta_accent") || "graphite");
+  const [density,   setDensity]   = useState(() => localStorage.getItem("ta_density") || "comfortable");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const t = applyAccent(THEMES[colorMode], colorMode, accent);
+
+  useEffect(() => { localStorage.setItem("ta_theme", colorMode); }, [colorMode]);
+  useEffect(() => { localStorage.setItem("ta_accent", accent); }, [accent]);
+  useEffect(() => { localStorage.setItem("ta_density", density); }, [density]);
 
   const [slots, setSlots] = useState([
     { id: 0, exprFile: null, metaFile: null, name: "Dataset 1" },
@@ -267,7 +299,7 @@ export default function App() {
   const locked = phase === "running";   // setup is read-only while a run is in flight
 
   return (
-    <div style={{ ...cssVars(colorMode), minHeight: "100vh", background: t.appBg, fontFamily: FONT_SANS, color: t.textPrimary }}>
+    <div style={{ ...cssVars(colorMode), "--accent": t.accent, "--accent-hover": t.accentHover, "--accent-soft": t.accentSoft, "--accent-text-on": t.accentTextOn, minHeight: "100vh", background: t.appBg, fontFamily: FONT_SANS, fontSize: density === "compact" ? 12.5 : 13.5, color: t.textPrimary }}>
       <style>{makeStyles(t)}</style>
 
       {/* Header */}
@@ -310,15 +342,39 @@ export default function App() {
             </span>
           </div>
         )}
-        <button
-          title={colorMode === "dark" ? "Switch to light" : "Switch to dark"}
-          onClick={() => setColorMode(m => m === "dark" ? "light" : "dark")}
-          style={{ height: 32, padding: "0 11px", display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${t.border}`, color: t.textSecondary, fontSize: 12, borderRadius: RADII.md, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}
-          onMouseEnter={e => { e.currentTarget.style.background = t.surface2; e.currentTarget.style.color = t.textPrimary; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.textSecondary; }}
-        >
-          {colorMode === "dark" ? "☀ Light" : "☾ Dark"}
-        </button>
+        <div style={{ position: "relative" }}>
+          <button
+            title="Settings"
+            onClick={() => setSettingsOpen(o => !o)}
+            style={{ height: 32, padding: "0 11px", display: "inline-flex", alignItems: "center", gap: 6, background: settingsOpen ? t.surface2 : "transparent", border: `1px solid ${t.border}`, color: settingsOpen ? t.textPrimary : t.textSecondary, fontSize: 12, borderRadius: RADII.md, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}
+            onMouseEnter={e => { e.currentTarget.style.background = t.surface2; e.currentTarget.style.color = t.textPrimary; }}
+            onMouseLeave={e => { if (!settingsOpen) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.textSecondary; } }}
+          >
+            ⚙ Settings
+          </button>
+
+          {settingsOpen && (
+            <>
+              <div onClick={() => setSettingsOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div style={{ position: "absolute", top: 40, right: 0, zIndex: 41, width: 232, padding: 14, background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: RADII.lg, boxShadow: SHADOW[colorMode].lg, display: "flex", flexDirection: "column", gap: 14 }}>
+                <SettingRow label="Theme">
+                  <Seg options={[{ k: "light", l: "Light" }, { k: "dark", l: "Dark" }]} value={colorMode} onChange={setColorMode} t={t} />
+                </SettingRow>
+                <SettingRow label="Accent">
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {Object.entries(ACCENTS).map(([key, a]) => (
+                      <button key={key} title={a.label} onClick={() => setAccent(key)}
+                        style={{ width: 30, height: 30, borderRadius: 8, background: a.swatch, cursor: "pointer", padding: 0, border: accent === key ? `2px solid ${t.textPrimary}` : `2px solid transparent`, boxShadow: accent === key ? `0 0 0 2px ${t.cardBg} inset` : "none" }} />
+                    ))}
+                  </div>
+                </SettingRow>
+                <SettingRow label="Density">
+                  <Seg options={[{ k: "compact", l: "Compact" }, { k: "comfortable", l: "Comfortable" }]} value={density} onChange={setDensity} t={t} />
+                </SettingRow>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div style={{ display: "flex", height: "calc(100vh - 52px)" }}>
