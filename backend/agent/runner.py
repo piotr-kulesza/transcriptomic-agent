@@ -725,6 +725,8 @@ async def run_agent_loop(
     # ── Layer 1: run characterization engine (deterministic, no LLM) ─────────
     hypotheses: list[dict] = list(seeds) + list(grid_hypotheses)  # S…, G…; H… appended during loop
     yield {"type": "mode", "mode": "reproduce" if temperature == 0.0 else "explore", "temperature": temperature}
+    # Surface how many prior-run findings were recalled for this namespace's data.
+    yield {"type": "prior_knowledge", "count": len(prior_entries)}
     if max_hypotheses != orig_max:
         yield {"type": "seed", "text": (
             f"Budget auto-raised from {orig_max} to {max_hypotheses} "

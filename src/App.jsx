@@ -131,6 +131,7 @@ export default function App() {
   const [degUploading,  setDegUploading]  = useState(false);
   const [degStatus,     setDegStatus]     = useState("");
   const [runCost,       setRunCost]       = useState(null);
+  const [priorCount,    setPriorCount]    = useState(0);
   const logEnd    = useRef(null);
   const scrollRef = useRef(null);
   const abortRef  = useRef(null);
@@ -244,7 +245,7 @@ export default function App() {
 
   const runAgent = async () => {
     if (!loaded.length && !degDatasets.length) return;
-    setPhase("running"); setLog([]); setStep(0); setHypotheses([]); setCurrentStatus("Running pre-analysis..."); setStreamingText(""); setRunCost(0);
+    setPhase("running"); setLog([]); setStep(0); setHypotheses([]); setCurrentStatus("Running pre-analysis..."); setStreamingText(""); setRunCost(0); setPriorCount(0);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -284,6 +285,7 @@ export default function App() {
             if (entry.type === "thought_stream") { flushSync(() => setStreamingText(prev => prev + entry.delta)); continue; }
             if (entry.type === "thought")        { flushSync(() => setStreamingText("")); }
             if (entry.type === "usage")          { setRunCost(entry.total_cost_usd); continue; }
+            if (entry.type === "prior_knowledge") { setPriorCount(entry.count || 0); continue; }
             if (entry.type === "hypothesis_propose") setHypotheses(prev => [...prev, entry.hypothesis]);
             if (entry.type === "hypothesis_eval")    setHypotheses(prev => prev.map(h => h.id === entry.hypothesis.id ? entry.hypothesis : h));
             addLog(entry);
@@ -338,6 +340,12 @@ export default function App() {
 
         <div style={{ flex: 1 }} />
 
+        {priorCount > 0 && (
+          <div title="Confirmed findings recalled from prior runs on this data" style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 11px", fontSize: 12, color: t.textSecondary, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 99 }}>
+            <span style={{ fontSize: 12 }}>🧠</span>
+            Remembers <b style={{ color: t.textPrimary, fontWeight: 600 }}>{priorCount}</b> prior finding{priorCount === 1 ? "" : "s"}
+          </div>
+        )}
         {runCost !== null && (
           <div title={`Estimated API cost (${piModel})`} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 11px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 99 }}>
             <span style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>$</span>
