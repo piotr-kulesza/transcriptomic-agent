@@ -2,44 +2,13 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
 import DatasetSlot from "./components/DatasetSlot";
 import LogEntry from "./components/LogEntry";
+import HypothesesPanel from "./components/HypothesesPanel";
 import { setGroupMappings, uploadDegDataset } from "./api";
-
-const THEMES = {
-  dark: {
-    appBg:         "#010816",
-    sidebarBg:     "#06101c",
-    cardBg:        "#0b1524",
-    elevatedBg:    "#0f1b2d",
-    accent:        "#5538e8",
-    accentHover:   "#6b52f0",
-    textPrimary:   "#e2e8f0",
-    textSecondary: "#94a3b8",
-    textMuted:     "#4e5d7a",
-    border:        "#152030",
-    startHoverBg:  "#1e1b4b",
-    dangerHoverBg: "#2d0c0c",
-    codeText:      "#c4b5fd",
-  },
-  light: {
-    appBg:         "#f8fafc",
-    sidebarBg:     "#f1f5f9",
-    cardBg:        "#ffffff",
-    elevatedBg:    "#f8fafc",
-    accent:        "#5538e8",
-    accentHover:   "#4527d0",
-    textPrimary:   "#0f172a",
-    textSecondary: "#334155",
-    textMuted:     "#64748b",
-    border:        "#e2e8f0",
-    startHoverBg:  "#eef2ff",
-    dangerHoverBg: "#fef2f2",
-    codeText:      "#4f46e5",
-  },
-};
+import { THEMES, FONT_SANS, RADII, SHADOW, cssVars } from "./theme";
 
 function makeStyles(t) {
   return `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
   html,body,#root{background:${t.appBg};width:100%;height:100%;overflow:hidden}
   ::-webkit-scrollbar{width:5px}
@@ -56,51 +25,44 @@ function makeStyles(t) {
   .blink{animation:pulse 1.4s infinite}
   .btn{
     background:${t.cardBg};border:1px solid ${t.border};color:${t.textPrimary};
-    font-family:inherit;font-size:13px;padding:7px 14px;cursor:pointer;
-    transition:background .15s,border-color .15s,color .15s;
-    width:100%;border-radius:6px;font-weight:500;
+    font-family:inherit;font-size:13px;padding:8px 14px;cursor:pointer;
+    transition:background .12s,border-color .12s,color .12s;
+    width:100%;border-radius:${RADII.md}px;font-weight:500;
   }
-  .btn:hover{background:${t.elevatedBg};border-color:${t.textMuted}40}
-  .btn:disabled{opacity:.35;cursor:not-allowed}
-  .bsm{padding:4px 10px;width:auto;font-size:12px}
-  .bdng{border-color:#be2a2a55;color:#f87171;background:transparent}
-  .bdng:hover{background:${t.dangerHoverBg};border-color:#f87171}
+  .btn:hover{background:${t.surface2};border-color:${t.borderStrong}}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .bsm{padding:5px 10px;width:auto;font-size:12px}
+  .bdng{border-color:${t.warning}55;color:${t.warning};background:transparent}
+  .bdng:hover{background:${t.dangerHoverBg};border-color:${t.warning}}
   .slot{
-    border:1px solid ${t.border};padding:12px;margin-bottom:8px;
-    background:${t.cardBg};border-radius:8px;transition:border-color .2s;
+    border:1px solid ${t.border};padding:11px;margin-bottom:8px;
+    background:${t.cardBg};border-radius:${RADII.md}px;transition:border-color .12s,box-shadow .12s;
   }
-  .slot.ok{border-color:${t.accent}30}
+  .slot:hover{border-color:${t.borderStrong};box-shadow:var(--shadow-sm)}
+  .slot.ok{border-color:${t.confirmedBd}}
   .uz{
-    border:1px dashed ${t.border};padding:9px 12px;text-align:center;cursor:pointer;
-    transition:all .15s;background:${t.appBg};display:flex;align-items:center;
+    border:1px dashed ${t.borderStrong};padding:9px 12px;text-align:center;cursor:pointer;
+    transition:all .12s;background:transparent;display:flex;align-items:center;
     justify-content:center;gap:6px;margin-bottom:6px;font-size:12px;
-    color:${t.textMuted};border-radius:6px;
+    color:${t.textMuted};border-radius:${RADII.md}px;
   }
-  .uz:hover{border-color:${t.accent}66;background:${t.elevatedBg};color:${t.accent}}
-  .uz.ok{border-color:${t.accent}35;color:${t.accent}}
-  .tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600}
+  .uz:hover{border-color:${t.accent};background:${t.accentSoft};color:${t.accent}}
+  .uz.ok{border-color:${t.confirmedBd};color:${t.confirmed}}
+  .tag{display:inline-block;padding:2px 7px;border-radius:${RADII.sm}px;font-size:11px;font-weight:600}
   input[type=text],input[type=number],select{
-    background:${t.appBg};border:1px solid ${t.border};color:${t.textPrimary};
-    padding:7px 10px;font-size:13px;font-family:inherit;width:100%;
-    border-radius:6px;transition:border-color .15s;
+    background:${t.cardBg};border:1px solid ${t.border};color:${t.textPrimary};
+    padding:8px 10px;font-size:12.5px;font-family:inherit;width:100%;
+    border-radius:${RADII.md}px;transition:border-color .12s;
   }
-  input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:${t.accent}55}
+  input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:${t.borderStrong}}
   .sec{
-    font-size:10px;color:${t.accent};letter-spacing:1.5px;
-    margin:20px 0 10px;font-weight:700;text-transform:uppercase;
+    font-size:10.5px;color:${t.textMuted};letter-spacing:0.06em;
+    margin:18px 0 9px;font-weight:600;text-transform:uppercase;
     display:flex;align-items:center;gap:8px;
   }
-  .sec:first-child{margin-top:4px}
-  .sec::after{content:'';flex:1;height:1px;background:${t.border}}
+  .sec:first-child{margin-top:6px}
   `;
 }
-
-const VERDICT_STYLE = {
-  confirmed: { color: "#4ade80", icon: "✓" },
-  rejected:  { color: "#f87171", icon: "✗" },
-  uncertain: { color: "#fbbf24", icon: "?" },
-  pending:   { color: "#94a3b8", icon: "○" },
-};
 
 export default function App() {
   const [colorMode, setColorMode] = useState("dark");
@@ -282,53 +244,61 @@ export default function App() {
   const hasData = loaded.length > 0 || degDatasets.length > 0;
 
   return (
-    <div style={{ minHeight: "100vh", background: t.appBg, fontFamily: "'Inter',system-ui,-apple-system,sans-serif", color: t.textPrimary }}>
+    <div style={{ ...cssVars(colorMode), minHeight: "100vh", background: t.appBg, fontFamily: FONT_SANS, color: t.textPrimary }}>
       <style>{makeStyles(t)}</style>
 
       {/* Header */}
-      <div style={{ height: 62, padding: "0 24px", display: "flex", alignItems: "center", gap: 14, background: t.sidebarBg, flexShrink: 0, position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(90deg, ${t.accent}0a 0%, transparent 55%)`, pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: t.border, pointerEvents: "none" }} />
+      <div style={{ height: 52, padding: "0 16px", display: "flex", alignItems: "center", gap: 14, background: t.sidebarBg, flexShrink: 0, borderBottom: `1px solid ${t.border}`, zIndex: 30 }}>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, zIndex: 1 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, ${t.accent}28, ${t.accent}0e)`, border: `1px solid ${t.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, color: t.accent, flexShrink: 0, boxShadow: `0 0 16px ${t.accent}20` }}>
-            ◈
+        {/* brand */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 31, height: 31, borderRadius: 8, background: t.accent, color: t.accentTextOn, display: "grid", placeItems: "center", flexShrink: 0, boxShadow: SHADOW[colorMode].sm }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+              <circle cx="12" cy="8.7" r="6.05" fill="currentColor" fillOpacity="0.5" />
+              <circle cx="8.4" cy="15" r="6.05" fill="currentColor" fillOpacity="0.5" />
+              <circle cx="15.6" cy="15" r="6.05" fill="currentColor" fillOpacity="0.5" />
+            </svg>
           </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: t.textPrimary, letterSpacing: -0.3, lineHeight: 1.25 }}>Transcriptomic Agent</div>
-            <div style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.25, marginTop: 2, letterSpacing: 0.1 }}>AI-powered multi-dataset transcriptomic analysis</div>
+          <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.04 }}>
+            <span style={{ fontWeight: 600, letterSpacing: "-0.02em", fontSize: 15.5, color: t.textPrimary }}>Transcriptomic Agent</span>
+            <span style={{ fontFamily: "'IBM Plex Mono',ui-monospace,monospace", fontSize: 8.5, letterSpacing: "0.16em", textTransform: "uppercase", color: t.textMuted, marginTop: 1 }}>Discovery engine</span>
           </div>
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, zIndex: 1 }}>
-          {phase === "running" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "4px 10px", background: `${t.accent}10`, border: `1px solid ${t.accent}28`, borderRadius: 5 }}>
-              <div className="blink" style={{ width: 6, height: 6, borderRadius: "50%", background: t.accent, boxShadow: `0 0 6px ${t.accent}`, flexShrink: 0 }} />
-              <span style={{ fontSize: 12, color: t.accent, fontWeight: 500 }}>
-                {hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} hypotheses
-              </span>
-            </div>
-          )}
-          {runCost !== null && (
-            <div title="Estimated API cost (claude-sonnet-4-6)" style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: `${t.accent}08`, border: `1px solid ${t.accent}22`, borderRadius: 5 }}>
-              <span style={{ fontSize: 11, color: t.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>$</span>
-              <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "'JetBrains Mono',monospace", fontWeight: 500 }}>
-                {runCost < 0.01 ? runCost.toFixed(4) : runCost.toFixed(3)}
-              </span>
-            </div>
-          )}
-          <button
-            onClick={() => setColorMode(m => m === "dark" ? "light" : "dark")}
-            style={{ background: "none", border: `1px solid ${t.border}`, color: t.textMuted, fontSize: 11, padding: "4px 10px", borderRadius: 5, cursor: "pointer", fontFamily: "inherit", letterSpacing: 0.3, transition: "all .15s" }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = t.accent; e.currentTarget.style.color = t.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.textMuted; }}
-          >
-            {colorMode === "dark" ? "Light" : "Dark"}
-          </button>
-        </div>
+        <div style={{ width: 1, height: 22, background: t.border }} />
+
+        {/* run status pill */}
+        {(phase === "running" || phase === "done") && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", fontSize: 12, color: t.textSecondary, padding: "4px 11px 4px 9px", border: `1px solid ${t.border}`, borderRadius: 99, background: t.surface2 }}>
+            <span className={phase === "running" ? "blink" : ""} style={{ width: 7, height: 7, borderRadius: 99, background: phase === "running" ? t.accent : t.confirmed, flexShrink: 0 }} />
+            {phase === "running"
+              ? <>Running · {hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} hypotheses</>
+              : <>Completed · {hypotheses.filter(h => ["confirmed", "uncertain", "rejected"].includes(h.status)).length} adjudicated</>}
+          </div>
+        )}
+
+        <div style={{ flex: 1 }} />
+
+        {runCost !== null && (
+          <div title="Estimated API cost (claude-sonnet-4-6)" style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 11px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 99 }}>
+            <span style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>$</span>
+            <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", fontWeight: 500 }}>
+              {runCost < 0.01 ? runCost.toFixed(4) : runCost.toFixed(3)}
+            </span>
+          </div>
+        )}
+        <button
+          title={colorMode === "dark" ? "Switch to light" : "Switch to dark"}
+          onClick={() => setColorMode(m => m === "dark" ? "light" : "dark")}
+          style={{ height: 32, padding: "0 11px", display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${t.border}`, color: t.textSecondary, fontSize: 12, borderRadius: RADII.md, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}
+          onMouseEnter={e => { e.currentTarget.style.background = t.surface2; e.currentTarget.style.color = t.textPrimary; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.textSecondary; }}
+        >
+          {colorMode === "dark" ? "☀ Light" : "☾ Dark"}
+        </button>
       </div>
 
-      <div style={{ display: "flex", height: "calc(100vh - 62px)" }}>
+      <div style={{ display: "flex", height: "calc(100vh - 52px)" }}>
 
         {/* LEFT PANEL */}
         <div style={{ width: 288, borderRight: `1px solid ${t.border}`, padding: "8px 14px 14px", overflowY: "auto", flexShrink: 0, background: t.sidebarBg }}>
@@ -359,10 +329,10 @@ export default function App() {
               {degUploading ? "Uploading..." : "Upload DEG table"}
             </button>
             {degStatus && (
-              <div style={{ fontSize: 12, marginBottom: 8, padding: "5px 9px", borderRadius: 5,
-                color: degStatus.startsWith("Error") ? "#f87171" : "#4ade80",
-                background: degStatus.startsWith("Error") ? (colorMode === "dark" ? "#2d0c0c" : "#fef2f2") : (colorMode === "dark" ? "#0a1f12" : "#f0fdf4"),
-                border: `1px solid ${degStatus.startsWith("Error") ? "#6e202044" : "#4ade8030"}` }}>
+              <div style={{ fontSize: 12, marginBottom: 8, padding: "5px 9px", borderRadius: RADII.sm,
+                color: degStatus.startsWith("Error") ? t.warning : t.confirmed,
+                background: degStatus.startsWith("Error") ? t.warningSoft : t.confirmedSoft,
+                border: `1px solid ${degStatus.startsWith("Error") ? `${t.warning}40` : t.confirmedBd}` }}>
                 {degStatus}
               </div>
             )}
@@ -374,7 +344,7 @@ export default function App() {
                     onClick={() => setDegDatasets(prev => prev.filter(x => x.name !== d.name))}>✕</button>
                 </div>
                 {(d.comparisons || []).map((c, i) => (
-                  <div key={i} style={{ fontSize: 12, color: t.textSecondary, lineHeight: 1.8, fontFamily: "'JetBrains Mono',monospace" }}>
+                  <div key={i} style={{ fontSize: 12, color: t.textSecondary, lineHeight: 1.8, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
                     {c.groupA} <span style={{ color: t.textMuted }}>vs</span> {c.groupB}
                     <span style={{ color: t.textMuted, marginLeft: 6 }}>{c.n_genes} genes</span>
                   </div>
@@ -409,7 +379,7 @@ export default function App() {
                     </option>
                   ))}
                 </select>
-                <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5, lineHeight: 1.9, fontFamily: "'JetBrains Mono',monospace" }}>
+                <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5, lineHeight: 1.9, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
                   {ds.groups.map(g => <div key={g} style={{ paddingLeft: 2 }}>{g}</div>)}
                 </div>
                 <div style={{ fontSize: 11, color: t.textMuted, marginTop: 4, opacity: 0.7 }}>
@@ -451,7 +421,7 @@ export default function App() {
                             ))}
                           </div>
                           {mg.canonical && (
-                            <div style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.6, fontFamily: "'JetBrains Mono',monospace" }}>
+                            <div style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.6, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
                               "{mg.canonical}" ← {allGroups.map(g => (
                                 <span key={g} style={{ marginRight: 6, color: mg.aliases.has(g) ? t.accent : t.textMuted }}>
                                   {g} {mg.aliases.has(g) ? "✓" : "✗"}
@@ -555,44 +525,8 @@ export default function App() {
 
         {/* HYPOTHESIS PANEL */}
         {(phase === "running" || hypotheses.length > 0) && (
-          <div style={{ width: 276, borderLeft: `1px solid ${t.border}`, padding: "8px 14px 14px", overflowY: "auto", flexShrink: 0, background: t.sidebarBg }}>
-            <div className="sec">Hypotheses</div>
-            {hypotheses.length === 0 && (
-              <div style={{ fontSize: 13, color: t.textMuted }}>Formulating hypotheses...</div>
-            )}
-            {hypotheses.map(h => {
-              const vs = VERDICT_STYLE[h.status] || VERDICT_STYLE.pending;
-              return (
-                <div key={h.id} style={{ marginBottom: 10, padding: "10px 12px", background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 7, borderLeft: `3px solid ${vs.color}55` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
-                    <span className="tag" style={{ background: `${vs.color}15`, color: vs.color, fontSize: 11, border: `1px solid ${vs.color}30` }}>{h.id}</span>
-                    <span style={{ fontSize: 11, color: vs.color, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase" }}>{vs.icon} {h.status}</span>
-                  </div>
-                  <div style={{ fontSize: 13, color: t.textPrimary, lineHeight: 1.65 }}>{h.text}</div>
-                  {h.evidence.length > 0 && (
-                    <div style={{ marginTop: 9, borderTop: `1px solid ${t.border}`, paddingTop: 9 }}>
-                      {h.evidence.map((ev, i) => (
-                        <div key={i} style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.6, marginBottom: 5 }}>
-                          <span style={{ color: t.textSecondary }}>step {ev.step} [{ev.action}]</span> {ev.reasoning}
-                          {ev.key_stats && Object.keys(ev.key_stats).length > 0 && (
-                            <div style={{ marginTop: 3, paddingLeft: 8, borderLeft: `2px solid ${t.border}`, fontFamily: "'JetBrains Mono',monospace" }}>
-                              {Object.entries(ev.key_stats).map(([gene, s]) => (
-                                <span key={gene} style={{ display: "inline-block", marginRight: 10, color: t.textMuted, fontSize: 11 }}>
-                                  <b style={{ color: t.textSecondary }}>{gene}</b>{": "}
-                                  {Object.entries(s).filter(([, v]) => v != null).map(([k, v]) =>
-                                    `${k}=${typeof v === "number" ? (Math.abs(v) < 0.001 ? v.toExponential(2) : v.toPrecision(3)) : Array.isArray(v) ? v.join(",") : v}`
-                                  ).join("  ")}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div style={{ width: 300, borderLeft: `1px solid ${t.border}`, flexShrink: 0, background: t.sidebarBg }}>
+            <HypothesesPanel hypotheses={hypotheses} maxHypotheses={maxHypotheses} theme={t} />
           </div>
         )}
       </div>

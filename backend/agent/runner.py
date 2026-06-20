@@ -372,6 +372,24 @@ def _extract_orientation_signed(action: str, result: dict, params: dict = None) 
     return out
 
 
+def _extract_evidence_het(action: str, result: dict) -> float | None:
+    """
+    Return a representative cross-cohort heterogeneity (Higgins I², in [0, 1])
+    for this evidence item, or None when the tool produces no heterogeneity stat.
+
+    Only cross_dataset_de runs a random-effects meta-analysis with per-gene I²
+    (see backend/tools/cross.py). We summarise it as the max I² across the top
+    consistent genes — the worst-case cohort disagreement behind the signal.
+    """
+    if action != "cross_dataset_de" or not isinstance(result, dict) or result.get("error"):
+        return None
+    i2s = [
+        g["i2"] for g in (result.get("top_consistent_up", []) + result.get("top_consistent_down", []))
+        if isinstance(g.get("i2"), (int, float))
+    ]
+    return float(max(i2s)) if i2s else None
+
+
 def _extract_evidence_meta(action: str, result: dict,
                             params: dict = None, deg_datasets: dict = None) -> tuple:
     """
@@ -1172,6 +1190,7 @@ async def run_agent_loop(
                     "dataset_ids": sorted(ds_ids),   # list for JSON-serialisability; union used in gate
                     "n_datasets": len(ds_ids),        # kept for display
                     "best_fdr": best_fdr,
+                    "het_i2": _extract_evidence_het(action, result or {}),
                     "reasoning": hypo_action.get("reasoning", ""),
                     "key_stats": extract_evidence_stats(action, result or {}, h.get("genes", [])),
                     "orientation":   _orient["orientation"],
