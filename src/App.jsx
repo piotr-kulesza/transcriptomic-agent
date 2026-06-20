@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import DatasetSlot from "./components/DatasetSlot";
 import LogEntry from "./components/LogEntry";
 import { setGroupMappings, uploadDegDataset } from "./api";
-import { THEMES, FONT_SANS, verdictStyle, cssVars } from "./theme";
+import { THEMES, FONT_SANS, RADII, SHADOW, verdictStyle, cssVars } from "./theme";
 
 function makeStyles(t) {
   return `
@@ -247,49 +247,57 @@ export default function App() {
       <style>{makeStyles(t)}</style>
 
       {/* Header */}
-      <div style={{ height: 62, padding: "0 24px", display: "flex", alignItems: "center", gap: 14, background: t.sidebarBg, flexShrink: 0, position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(90deg, ${t.accent}0a 0%, transparent 55%)`, pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: t.border, pointerEvents: "none" }} />
+      <div style={{ height: 52, padding: "0 16px", display: "flex", alignItems: "center", gap: 14, background: t.sidebarBg, flexShrink: 0, borderBottom: `1px solid ${t.border}`, zIndex: 30 }}>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, zIndex: 1 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, ${t.accent}28, ${t.accent}0e)`, border: `1px solid ${t.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, color: t.accent, flexShrink: 0, boxShadow: `0 0 16px ${t.accent}20` }}>
-            ◈
+        {/* brand */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 31, height: 31, borderRadius: 8, background: t.accent, color: t.accentTextOn, display: "grid", placeItems: "center", flexShrink: 0, boxShadow: SHADOW[colorMode].sm }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+              <circle cx="12" cy="8.7" r="6.05" fill="currentColor" fillOpacity="0.5" />
+              <circle cx="8.4" cy="15" r="6.05" fill="currentColor" fillOpacity="0.5" />
+              <circle cx="15.6" cy="15" r="6.05" fill="currentColor" fillOpacity="0.5" />
+            </svg>
           </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: t.textPrimary, letterSpacing: -0.3, lineHeight: 1.25 }}>Transcriptomic Agent</div>
-            <div style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.25, marginTop: 2, letterSpacing: 0.1 }}>AI-powered multi-dataset transcriptomic analysis</div>
+          <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.04 }}>
+            <span style={{ fontWeight: 600, letterSpacing: "-0.02em", fontSize: 15.5, color: t.textPrimary }}>Transcriptomic Agent</span>
+            <span style={{ fontFamily: "'IBM Plex Mono',ui-monospace,monospace", fontSize: 8.5, letterSpacing: "0.16em", textTransform: "uppercase", color: t.textMuted, marginTop: 1 }}>Discovery engine</span>
           </div>
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, zIndex: 1 }}>
-          {phase === "running" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "4px 10px", background: `${t.accent}10`, border: `1px solid ${t.accent}28`, borderRadius: 5 }}>
-              <div className="blink" style={{ width: 6, height: 6, borderRadius: "50%", background: t.accent, boxShadow: `0 0 6px ${t.accent}`, flexShrink: 0 }} />
-              <span style={{ fontSize: 12, color: t.accent, fontWeight: 500 }}>
-                {hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} hypotheses
-              </span>
-            </div>
-          )}
-          {runCost !== null && (
-            <div title="Estimated API cost (claude-sonnet-4-6)" style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: `${t.accent}08`, border: `1px solid ${t.accent}22`, borderRadius: 5 }}>
-              <span style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>$</span>
-              <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", fontWeight: 500 }}>
-                {runCost < 0.01 ? runCost.toFixed(4) : runCost.toFixed(3)}
-              </span>
-            </div>
-          )}
-          <button
-            onClick={() => setColorMode(m => m === "dark" ? "light" : "dark")}
-            style={{ background: "none", border: `1px solid ${t.border}`, color: t.textMuted, fontSize: 11, padding: "4px 10px", borderRadius: 5, cursor: "pointer", fontFamily: "inherit", letterSpacing: 0.3, transition: "all .15s" }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = t.accent; e.currentTarget.style.color = t.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.textMuted; }}
-          >
-            {colorMode === "dark" ? "Light" : "Dark"}
-          </button>
-        </div>
+        <div style={{ width: 1, height: 22, background: t.border }} />
+
+        {/* run status pill */}
+        {(phase === "running" || phase === "done") && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", fontSize: 12, color: t.textSecondary, padding: "4px 11px 4px 9px", border: `1px solid ${t.border}`, borderRadius: 99, background: t.surface2 }}>
+            <span className={phase === "running" ? "blink" : ""} style={{ width: 7, height: 7, borderRadius: 99, background: phase === "running" ? t.accent : t.confirmed, flexShrink: 0 }} />
+            {phase === "running"
+              ? <>Running · {hypotheses.filter(h => h.status !== "pending").length}/{maxHypotheses} hypotheses</>
+              : <>Completed · {hypotheses.filter(h => ["confirmed", "uncertain", "rejected"].includes(h.status)).length} adjudicated</>}
+          </div>
+        )}
+
+        <div style={{ flex: 1 }} />
+
+        {runCost !== null && (
+          <div title="Estimated API cost (claude-sonnet-4-6)" style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 11px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 99 }}>
+            <span style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>$</span>
+            <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", fontWeight: 500 }}>
+              {runCost < 0.01 ? runCost.toFixed(4) : runCost.toFixed(3)}
+            </span>
+          </div>
+        )}
+        <button
+          title={colorMode === "dark" ? "Switch to light" : "Switch to dark"}
+          onClick={() => setColorMode(m => m === "dark" ? "light" : "dark")}
+          style={{ height: 32, padding: "0 11px", display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${t.border}`, color: t.textSecondary, fontSize: 12, borderRadius: RADII.md, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}
+          onMouseEnter={e => { e.currentTarget.style.background = t.surface2; e.currentTarget.style.color = t.textPrimary; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.textSecondary; }}
+        >
+          {colorMode === "dark" ? "☀ Light" : "☾ Dark"}
+        </button>
       </div>
 
-      <div style={{ display: "flex", height: "calc(100vh - 62px)" }}>
+      <div style={{ display: "flex", height: "calc(100vh - 52px)" }}>
 
         {/* LEFT PANEL */}
         <div style={{ width: 288, borderRight: `1px solid ${t.border}`, padding: "8px 14px 14px", overflowY: "auto", flexShrink: 0, background: t.sidebarBg }}>
