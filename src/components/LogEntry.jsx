@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { verdictStyle } from "../theme";
 
 const ACTION_COLORS = {
   dataset_summary:           "#94a3b8",
@@ -16,13 +17,6 @@ const ACTION_COLORS = {
   invariant_axis:            "#f59e0b",
   cross_dataset_rewiring:    "#fb7185",
   execute_code:              "#a78bfa",
-};
-
-const VERDICT_STYLE = {
-  confirmed: { color: "#4ade80", icon: "✓", label: "Confirmed" },
-  rejected:  { color: "#f87171", icon: "✗", label: "Rejected"  },
-  uncertain: { color: "#fbbf24", icon: "?", label: "Uncertain"  },
-  pending:   { color: "#94a3b8", icon: "○", label: "Pending"    },
 };
 
 function renderInline(text, t) {
@@ -82,7 +76,7 @@ function ResultTable({ rows, t }) {
   if (!rows || rows.length === 0) return null;
   const keys = Object.keys(rows[0]);
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}>
+    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
       <thead>
         <tr>
           {keys.map(k => (
@@ -109,7 +103,7 @@ function ResultTable({ rows, t }) {
 
 function renderResult(result, t) {
   if (!result || typeof result !== "object") {
-    return <pre style={{ fontSize: 11, color: t.textMuted, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "pre-wrap", margin: 0 }}>{String(result)}</pre>;
+    return <pre style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", whiteSpace: "pre-wrap", margin: 0 }}>{String(result)}</pre>;
   }
   if (result.error) {
     return <span style={{ fontSize: 12, color: "#f87171" }}>{result.error}</span>;
@@ -137,7 +131,7 @@ function renderResult(result, t) {
   // If nothing structured, fall back to JSON
   if (scalars.length === 0 && tables.length === 0) {
     return (
-      <pre style={{ fontSize: 11, color: t.textMuted, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "pre-wrap", margin: 0 }}>
+      <pre style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", whiteSpace: "pre-wrap", margin: 0 }}>
         {JSON.stringify(result, null, 2).slice(0, 4000)}
       </pre>
     );
@@ -148,7 +142,7 @@ function renderResult(result, t) {
       {scalars.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 20px", marginBottom: tables.length > 0 ? 10 : 0 }}>
           {scalars.map(([k, v]) => (
-            <span key={k} style={{ fontSize: 11, color: t.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>
+            <span key={k} style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
               <span style={{ color: t.textSecondary }}>{k}:</span> {String(v)}
             </span>
           ))}
@@ -172,7 +166,7 @@ function renderThought(text, t) {
     if (part.startsWith("```")) {
       const body = part.slice(3, -3).replace(/^\w+\n/, "");
       return (
-        <pre key={i} style={{ margin: "8px 0", padding: "10px 12px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 12, color: t.codeText, overflowX: "auto", lineHeight: 1.6, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace", whiteSpace: "pre-wrap" }}>
+        <pre key={i} style={{ margin: "8px 0", padding: "10px 12px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 12, color: t.codeText, overflowX: "auto", lineHeight: 1.6, borderRadius: 6, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", whiteSpace: "pre-wrap" }}>
           {body}
         </pre>
       );
@@ -211,7 +205,7 @@ export default function LogEntry({ entry, theme: t }) {
           {entry.type === "code" && (
             <div style={{ paddingLeft: 16, borderLeft: `2px solid ${t.border}` }}>
               <div style={{ fontSize: 10, color: t.codeText, marginBottom: 4, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>Code</div>
-              <pre style={{ padding: "7px 10px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 10, color: t.codeText, overflowX: "auto", maxHeight: 120, overflowY: "auto", lineHeight: 1.5, borderRadius: 6, fontFamily: "'JetBrains Mono',monospace" }}>
+              <pre style={{ padding: "7px 10px", background: t.appBg, border: `1px solid ${t.border}`, fontSize: 10, color: t.codeText, overflowX: "auto", maxHeight: 120, overflowY: "auto", lineHeight: 1.5, borderRadius: 6, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
                 {entry.code}
               </pre>
             </div>
@@ -220,7 +214,7 @@ export default function LogEntry({ entry, theme: t }) {
           {entry.type === "result" && (
             <div style={{ paddingLeft: 16, borderLeft: `2px solid ${ac}35` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-                <span className="tag" style={{ background: `${ac}15`, color: ac, fontWeight: 600, fontSize: 11, fontFamily: "'JetBrains Mono',monospace", border: `1px solid ${ac}30` }}>
+                <span className="tag" style={{ background: `${ac}15`, color: ac, fontWeight: 600, fontSize: 11, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", border: `1px solid ${ac}30` }}>
                   {entry.action}
                 </span>
                 <span style={{ fontSize: 13, color: t.textSecondary, flex: 1, lineHeight: 1.5 }}>{entry.summary}</span>
@@ -244,7 +238,7 @@ export default function LogEntry({ entry, theme: t }) {
           )}
 
           {entry.type === "hypothesis_eval" && (() => {
-            const vs = VERDICT_STYLE[entry.hypothesis.status] || VERDICT_STYLE.uncertain;
+            const vs = verdictStyle(t, entry.hypothesis.status);
             return (
               <div style={{ padding: "10px 14px", background: t.cardBg, border: `1px solid ${vs.color}22`, borderLeft: `3px solid ${vs.color}`, borderRadius: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: entry.reasoning ? 6 : 0 }}>

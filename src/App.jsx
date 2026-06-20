@@ -3,43 +3,11 @@ import { flushSync } from "react-dom";
 import DatasetSlot from "./components/DatasetSlot";
 import LogEntry from "./components/LogEntry";
 import { setGroupMappings, uploadDegDataset } from "./api";
-
-const THEMES = {
-  dark: {
-    appBg:         "#010816",
-    sidebarBg:     "#06101c",
-    cardBg:        "#0b1524",
-    elevatedBg:    "#0f1b2d",
-    accent:        "#5538e8",
-    accentHover:   "#6b52f0",
-    textPrimary:   "#e2e8f0",
-    textSecondary: "#94a3b8",
-    textMuted:     "#4e5d7a",
-    border:        "#152030",
-    startHoverBg:  "#1e1b4b",
-    dangerHoverBg: "#2d0c0c",
-    codeText:      "#c4b5fd",
-  },
-  light: {
-    appBg:         "#f8fafc",
-    sidebarBg:     "#f1f5f9",
-    cardBg:        "#ffffff",
-    elevatedBg:    "#f8fafc",
-    accent:        "#5538e8",
-    accentHover:   "#4527d0",
-    textPrimary:   "#0f172a",
-    textSecondary: "#334155",
-    textMuted:     "#64748b",
-    border:        "#e2e8f0",
-    startHoverBg:  "#eef2ff",
-    dangerHoverBg: "#fef2f2",
-    codeText:      "#4f46e5",
-  },
-};
+import { THEMES, FONT_SANS, verdictStyle, cssVars } from "./theme";
 
 function makeStyles(t) {
   return `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
   html,body,#root{background:${t.appBg};width:100%;height:100%;overflow:hidden}
   ::-webkit-scrollbar{width:5px}
@@ -94,13 +62,6 @@ function makeStyles(t) {
   .sec::after{content:'';flex:1;height:1px;background:${t.border}}
   `;
 }
-
-const VERDICT_STYLE = {
-  confirmed: { color: "#4ade80", icon: "✓" },
-  rejected:  { color: "#f87171", icon: "✗" },
-  uncertain: { color: "#fbbf24", icon: "?" },
-  pending:   { color: "#94a3b8", icon: "○" },
-};
 
 export default function App() {
   const [colorMode, setColorMode] = useState("dark");
@@ -282,7 +243,7 @@ export default function App() {
   const hasData = loaded.length > 0 || degDatasets.length > 0;
 
   return (
-    <div style={{ minHeight: "100vh", background: t.appBg, fontFamily: "'Inter',system-ui,-apple-system,sans-serif", color: t.textPrimary }}>
+    <div style={{ ...cssVars(colorMode), minHeight: "100vh", background: t.appBg, fontFamily: FONT_SANS, color: t.textPrimary }}>
       <style>{makeStyles(t)}</style>
 
       {/* Header */}
@@ -311,8 +272,8 @@ export default function App() {
           )}
           {runCost !== null && (
             <div title="Estimated API cost (claude-sonnet-4-6)" style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: `${t.accent}08`, border: `1px solid ${t.accent}22`, borderRadius: 5 }}>
-              <span style={{ fontSize: 11, color: t.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>$</span>
-              <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "'JetBrains Mono',monospace", fontWeight: 500 }}>
+              <span style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>$</span>
+              <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", fontWeight: 500 }}>
                 {runCost < 0.01 ? runCost.toFixed(4) : runCost.toFixed(3)}
               </span>
             </div>
@@ -374,7 +335,7 @@ export default function App() {
                     onClick={() => setDegDatasets(prev => prev.filter(x => x.name !== d.name))}>✕</button>
                 </div>
                 {(d.comparisons || []).map((c, i) => (
-                  <div key={i} style={{ fontSize: 12, color: t.textSecondary, lineHeight: 1.8, fontFamily: "'JetBrains Mono',monospace" }}>
+                  <div key={i} style={{ fontSize: 12, color: t.textSecondary, lineHeight: 1.8, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
                     {c.groupA} <span style={{ color: t.textMuted }}>vs</span> {c.groupB}
                     <span style={{ color: t.textMuted, marginLeft: 6 }}>{c.n_genes} genes</span>
                   </div>
@@ -409,7 +370,7 @@ export default function App() {
                     </option>
                   ))}
                 </select>
-                <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5, lineHeight: 1.9, fontFamily: "'JetBrains Mono',monospace" }}>
+                <div style={{ fontSize: 11, color: t.textMuted, marginTop: 5, lineHeight: 1.9, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
                   {ds.groups.map(g => <div key={g} style={{ paddingLeft: 2 }}>{g}</div>)}
                 </div>
                 <div style={{ fontSize: 11, color: t.textMuted, marginTop: 4, opacity: 0.7 }}>
@@ -451,7 +412,7 @@ export default function App() {
                             ))}
                           </div>
                           {mg.canonical && (
-                            <div style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.6, fontFamily: "'JetBrains Mono',monospace" }}>
+                            <div style={{ fontSize: 11, color: t.textMuted, lineHeight: 1.6, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
                               "{mg.canonical}" ← {allGroups.map(g => (
                                 <span key={g} style={{ marginRight: 6, color: mg.aliases.has(g) ? t.accent : t.textMuted }}>
                                   {g} {mg.aliases.has(g) ? "✓" : "✗"}
@@ -561,7 +522,7 @@ export default function App() {
               <div style={{ fontSize: 13, color: t.textMuted }}>Formulating hypotheses...</div>
             )}
             {hypotheses.map(h => {
-              const vs = VERDICT_STYLE[h.status] || VERDICT_STYLE.pending;
+              const vs = verdictStyle(t, h.status);
               return (
                 <div key={h.id} style={{ marginBottom: 10, padding: "10px 12px", background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 7, borderLeft: `3px solid ${vs.color}55` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
@@ -575,7 +536,7 @@ export default function App() {
                         <div key={i} style={{ fontSize: 12, color: t.textMuted, lineHeight: 1.6, marginBottom: 5 }}>
                           <span style={{ color: t.textSecondary }}>step {ev.step} [{ev.action}]</span> {ev.reasoning}
                           {ev.key_stats && Object.keys(ev.key_stats).length > 0 && (
-                            <div style={{ marginTop: 3, paddingLeft: 8, borderLeft: `2px solid ${t.border}`, fontFamily: "'JetBrains Mono',monospace" }}>
+                            <div style={{ marginTop: 3, paddingLeft: 8, borderLeft: `2px solid ${t.border}`, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>
                               {Object.entries(ev.key_stats).map(([gene, s]) => (
                                 <span key={gene} style={{ display: "inline-block", marginRight: 10, color: t.textMuted, fontSize: 11 }}>
                                   <b style={{ color: t.textSecondary }}>{gene}</b>{": "}
