@@ -119,6 +119,7 @@ export default function App() {
   const [step,          setStep]          = useState(0);
   const [maxHypotheses, setMaxHypotheses] = useState(3);
   const [agentMode,     setAgentMode]     = useState("reproduce");
+  const [piModel,       setPiModel]       = useState("claude-opus-4-8");
   const [currentStatus, setCurrentStatus] = useState("");
   const [streamingText, setStreamingText] = useState("");
   const [mappingGroups, setMappingGroups] = useState([]);
@@ -253,7 +254,7 @@ export default function App() {
       const res = await fetch("http://localhost:8000/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataset_ids: loaded.map(d => d.id), group_cols: groupMap, max_hypotheses: maxHypotheses, mode: agentMode }),
+        body: JSON.stringify({ dataset_ids: loaded.map(d => d.id), group_cols: groupMap, max_hypotheses: maxHypotheses, mode: agentMode, model: piModel }),
         signal: controller.signal,
       });
 
@@ -338,7 +339,7 @@ export default function App() {
         <div style={{ flex: 1 }} />
 
         {runCost !== null && (
-          <div title="Estimated API cost (claude-sonnet-4-6)" style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 11px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 99 }}>
+          <div title={`Estimated API cost (${piModel})`} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 11px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 99 }}>
             <span style={{ fontSize: 11, color: t.textMuted, fontFamily: "'IBM Plex Mono',ui-monospace,monospace" }}>$</span>
             <span style={{ fontSize: 12, color: t.textSecondary, fontFamily: "'IBM Plex Mono',ui-monospace,monospace", fontWeight: 500 }}>
               {runCost < 0.01 ? runCost.toFixed(4) : runCost.toFixed(3)}
@@ -563,6 +564,13 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            <div className="sec">PI Model</div>
+            <select value={piModel} onChange={e => setPiModel(e.target.value)} style={{ marginBottom: 12 }}>
+              <option value="claude-opus-4-8">Claude Opus 4.8 — most capable</option>
+              <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — balanced</option>
+              <option value="claude-haiku-4-5">Claude Haiku 4.5 — fast & cheap</option>
+            </select>
 
             <div className="sec">Hypotheses to test</div>
             <input type="number" value={maxHypotheses} min={1} max={30}

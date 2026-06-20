@@ -307,6 +307,7 @@ class RunRequest(BaseModel):
     group_cols: dict[str, str]  # dataset_id → chosen group_col
     max_hypotheses: int = 3
     mode: str = "reproduce"  # "reproduce" | "explore"
+    model: Optional[str] = None  # PI model id; validated against MODEL_PRICING, falls back to default
     user_id: str = "local"
     project_id: Optional[str] = None  # auto-derived from dataset/group fingerprint if absent
     # Translational annotation (opt-in). When True, after a hypothesis is CONFIRMED
@@ -351,6 +352,7 @@ async def run_agent(req: RunRequest):
             temperature=temperature, mappings=run_mappings, deg_datasets=run_deg_datasets,
             user_id=req.user_id, project_id=project_id,
             translational=req.translational, condition=req.condition,
+            model=req.model,
         ):
             if event.get("type") == "error":
                 logger.error("Agent error: %s", event.get("text", ""))

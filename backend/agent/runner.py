@@ -92,6 +92,20 @@ from ..tools.sandbox import execute_sandbox
 
 REPORTS_ROOT = "reports"
 
+# Selectable PI models + per-token pricing (input, output, cache-write, cache-read) in USD.
+# Cache-write = 1.25x input (5-min TTL); cache-read = 0.1x input.
+MODEL_PRICING = {
+    "claude-opus-4-8":   (5e-6, 25e-6, 6.25e-6, 0.5e-6),
+    "claude-sonnet-4-6": (3e-6, 15e-6, 3.75e-6, 0.3e-6),
+    "claude-haiku-4-5":  (1e-6,  5e-6, 1.25e-6, 0.1e-6),
+}
+DEFAULT_MODEL = "claude-opus-4-8"
+
+
+def _resolve_model(model: str | None) -> str:
+    """Map a requested model to a supported id, falling back to the default."""
+    return model if model in MODEL_PRICING else DEFAULT_MODEL
+
 
 def _namespaced_reports_dir(user_id: str, project_id: str) -> str:
     user_seg = _safe_segment(user_id, DEFAULT_USER_ID)
@@ -617,6 +631,7 @@ async def run_agent_loop(
     reports_root: str = REPORTS_ROOT,
     translational: bool = False,
     condition: str | None = None,
+    model: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Async generator — yields log event dicts.
@@ -628,6 +643,8 @@ async def run_agent_loop(
     """
     mappings = mappings or {}
     deg_datasets = deg_datasets or {}
+    model = _resolve_model(model)
+    in_price, out_price, cw_price, cr_price = MODEL_PRICING[model]
     if memory_store is None:
         memory_store = FileMemoryStore(root=DEFAULT_MEMORY_ROOT)
     if not project_id:
@@ -906,7 +923,7 @@ async def run_agent_loop(
         _step_usage = None
         try:
             async with client.messages.stream(
-                model="claude-opus-4-8",
+                model=model,
                 max_tokens=16000,
                 temperature=temperature,
                 system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
@@ -938,8 +955,8 @@ async def run_agent_loop(
             _out = _step_usage.output_tokens
             _cw  = getattr(_step_usage, "cache_creation_input_tokens", 0) or 0
             _cr  = getattr(_step_usage, "cache_read_input_tokens", 0) or 0
-            # claude-opus-4-8 pricing: $5/1M input, $25/1M output, $6.25/1M cache-write, $0.50/1M cache-read
-            step_cost = _in * 5e-6 + _out * 25e-6 + _cw * 6.25e-6 + _cr * 0.5e-6
+            # Per-model pricing (input, output, cache-write, cache-read) from MODEL_PRICING.
+            step_cost = _in * in_price + _out * out_price + _cw * cw_price + _cr * cr_price
             total_cost_usd += step_cost
             yield {
                 "type": "usage",
@@ -1065,7 +1082,7 @@ async def run_agent_loop(
                 "project_id": project_id,
                 "datasets": [ds["name"] for ds in datasets] + sorted(deg_datasets.keys()),
                 "groups": sorted({g for ds in datasets for g in ds.get("groups", [])}),
-                "model": "claude-opus-4-8",
+                "model": model,
             }
             new_claims = extract_claims_from_hypotheses(hypotheses, direction_claims_by_hid)
             contradictions: list[dict] = []
@@ -1317,7 +1334,7 @@ async def run_agent_loop(
         "project_id": project_id,
         "datasets": [ds["name"] for ds in datasets] + sorted(deg_datasets.keys()),
         "groups": sorted({g for ds in datasets for g in ds.get("groups", [])}),
-        "model": "claude-opus-4-8",
+        "model": model,
     }
     new_claims = extract_claims_from_hypotheses(hypotheses, direction_claims_by_hid)
     contradictions: list[dict] = []
