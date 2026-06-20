@@ -24,42 +24,42 @@ function makeStyles(t) {
   .blink{animation:pulse 1.4s infinite}
   .btn{
     background:${t.cardBg};border:1px solid ${t.border};color:${t.textPrimary};
-    font-family:inherit;font-size:13px;padding:7px 14px;cursor:pointer;
-    transition:background .15s,border-color .15s,color .15s;
-    width:100%;border-radius:6px;font-weight:500;
+    font-family:inherit;font-size:13px;padding:8px 14px;cursor:pointer;
+    transition:background .12s,border-color .12s,color .12s;
+    width:100%;border-radius:${RADII.md}px;font-weight:500;
   }
-  .btn:hover{background:${t.elevatedBg};border-color:${t.textMuted}40}
-  .btn:disabled{opacity:.35;cursor:not-allowed}
-  .bsm{padding:4px 10px;width:auto;font-size:12px}
-  .bdng{border-color:#be2a2a55;color:#f87171;background:transparent}
-  .bdng:hover{background:${t.dangerHoverBg};border-color:#f87171}
+  .btn:hover{background:${t.surface2};border-color:${t.borderStrong}}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .bsm{padding:5px 10px;width:auto;font-size:12px}
+  .bdng{border-color:${t.warning}55;color:${t.warning};background:transparent}
+  .bdng:hover{background:${t.dangerHoverBg};border-color:${t.warning}}
   .slot{
-    border:1px solid ${t.border};padding:12px;margin-bottom:8px;
-    background:${t.cardBg};border-radius:8px;transition:border-color .2s;
+    border:1px solid ${t.border};padding:11px;margin-bottom:8px;
+    background:${t.cardBg};border-radius:${RADII.md}px;transition:border-color .12s,box-shadow .12s;
   }
-  .slot.ok{border-color:${t.accent}30}
+  .slot:hover{border-color:${t.borderStrong};box-shadow:var(--shadow-sm)}
+  .slot.ok{border-color:${t.confirmedBd}}
   .uz{
-    border:1px dashed ${t.border};padding:9px 12px;text-align:center;cursor:pointer;
-    transition:all .15s;background:${t.appBg};display:flex;align-items:center;
+    border:1px dashed ${t.borderStrong};padding:9px 12px;text-align:center;cursor:pointer;
+    transition:all .12s;background:transparent;display:flex;align-items:center;
     justify-content:center;gap:6px;margin-bottom:6px;font-size:12px;
-    color:${t.textMuted};border-radius:6px;
+    color:${t.textMuted};border-radius:${RADII.md}px;
   }
-  .uz:hover{border-color:${t.accent}66;background:${t.elevatedBg};color:${t.accent}}
-  .uz.ok{border-color:${t.accent}35;color:${t.accent}}
-  .tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600}
+  .uz:hover{border-color:${t.accent};background:${t.accentSoft};color:${t.accent}}
+  .uz.ok{border-color:${t.confirmedBd};color:${t.confirmed}}
+  .tag{display:inline-block;padding:2px 7px;border-radius:${RADII.sm}px;font-size:11px;font-weight:600}
   input[type=text],input[type=number],select{
-    background:${t.appBg};border:1px solid ${t.border};color:${t.textPrimary};
-    padding:7px 10px;font-size:13px;font-family:inherit;width:100%;
-    border-radius:6px;transition:border-color .15s;
+    background:${t.cardBg};border:1px solid ${t.border};color:${t.textPrimary};
+    padding:8px 10px;font-size:12.5px;font-family:inherit;width:100%;
+    border-radius:${RADII.md}px;transition:border-color .12s;
   }
-  input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:${t.accent}55}
+  input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:${t.borderStrong}}
   .sec{
-    font-size:10px;color:${t.accent};letter-spacing:1.5px;
-    margin:20px 0 10px;font-weight:700;text-transform:uppercase;
+    font-size:10.5px;color:${t.textMuted};letter-spacing:0.06em;
+    margin:18px 0 9px;font-weight:600;text-transform:uppercase;
     display:flex;align-items:center;gap:8px;
   }
-  .sec:first-child{margin-top:4px}
-  .sec::after{content:'';flex:1;height:1px;background:${t.border}}
+  .sec:first-child{margin-top:6px}
   `;
 }
 
