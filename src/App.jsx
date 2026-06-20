@@ -90,10 +90,27 @@ export default function App() {
   const [degUploading,  setDegUploading]  = useState(false);
   const [degStatus,     setDegStatus]     = useState("");
   const [runCost,       setRunCost]       = useState(null);
-  const logEnd   = useRef(null);
-  const abortRef = useRef(null);
+  const logEnd    = useRef(null);
+  const scrollRef = useRef(null);
+  const abortRef  = useRef(null);
+  const [atBottom, setAtBottom] = useState(true);
 
-  useEffect(() => { logEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [log]);
+  // Auto-scroll to the newest entry only while the user is pinned to the bottom,
+  // so reading back through the log isn't yanked away as new steps stream in.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && atBottom) el.scrollTop = el.scrollHeight;
+  }, [log, streamingText, currentStatus, atBottom]);
+
+  const onLogScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+  };
+  const jumpToLatest = () => {
+    const el = scrollRef.current;
+    if (el) { el.scrollTop = el.scrollHeight; setAtBottom(true); }
+  };
   const addLog = useCallback(e => setLog(prev => [...prev, { ...e, id: Date.now() + Math.random() }]), []);
 
   const addSlot    = () => setSlots(p => [...p, { id: Date.now(), exprFile: null, metaFile: null, name: `Dataset ${p.length + 1}` }]);
@@ -484,7 +501,7 @@ export default function App() {
         </div>
 
         {/* LOG PANEL */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
 
           {currentStatus && (
             <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "9px 24px", borderBottom: `1px solid ${t.border}`, background: t.sidebarBg }}>
@@ -494,7 +511,7 @@ export default function App() {
             </div>
           )}
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+          <div ref={scrollRef} onScroll={onLogScroll} style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
             {log.length === 0 && !currentStatus && (
               <div style={{ textAlign: "center", marginTop: "26vh" }}>
                 <div style={{ width: 52, height: 52, margin: "0 auto 20px", background: `${t.accent}10`, border: `1px solid ${t.accent}20`, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: `${t.accent}50` }}>◈</div>
@@ -521,6 +538,15 @@ export default function App() {
             )}
             <div ref={logEnd} />
           </div>
+
+          {!atBottom && log.length > 0 && (
+            <button
+              onClick={jumpToLatest}
+              style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", bottom: 16, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 13px", fontSize: 12, fontWeight: 500, color: t.accentTextOn, background: t.accent, border: "none", borderRadius: 99, cursor: "pointer", fontFamily: "inherit", boxShadow: SHADOW[colorMode].md, zIndex: 5 }}
+            >
+              ↓ Jump to latest
+            </button>
+          )}
         </div>
 
         {/* HYPOTHESIS PANEL */}
