@@ -10,13 +10,26 @@ import itertools
 from ..tools.cross import resolve_group
 from .orient import canonical_order
 
-# Off-grid budget: agent-proposed H-hypotheses allowed after grid is covered
-# Layer 2 explores until novelty exhausted (3 consecutive novel:false), up to this cap
-K_OFF_GRID: int = 15
+# Off-grid budget: agent-proposed H-hypotheses allowed after the grid is covered.
+# Layer 2 explores until novelty exhausted (3 consecutive novel:false); this is only
+# an UPPER BOUND on that exploration, not a quota. It scales with the analysis space
+# (number of group comparisons) rather than being a flat constant, so near-empty grids
+# (e.g. 2-group data, 1 comparison) don't demand a large exploration tail.
+MIN_OFFGRID: int = 3       # floor of off-grid headroom (even for a single comparison)
+PER_COMPARISON: int = 2    # additional off-grid headroom per group comparison
 # Hard cap on grid cells — prevents balloon for large many-group datasets
 _MAX_GRID_CELLS: int = 20
-# Safety ceiling on auto-raised max_hypotheses
+# Safety ceiling on auto-raised max_hypotheses (the only hard ceiling on the budget)
 _MAX_AUTO_RAISE: int = 80
+
+
+def off_grid_headroom(n_comparisons: int) -> int:
+    """Upper bound on agent-proposed off-grid hypotheses, scaled by the analysis space.
+
+    1 comparison → 3, 6 → 12, 10 → 20. There is intentionally no fixed ceiling on this
+    term: the global _MAX_AUTO_RAISE cap and the novelty-stop logic are the real bounds.
+    """
+    return max(MIN_OFFGRID, PER_COMPARISON * max(0, n_comparisons))
 
 
 def _canonical_pair(a: str, b: str) -> tuple[str, str]:
@@ -36,27 +49,14 @@ def _deg_source_count(deg_datasets: dict, gA: str, gB: str, mappings: dict) -> i
     return n
 
 
-def build_coverage_grid(
-    datasets: list,
-    deg_datasets: dict,
-    mappings: dict,
-    deg_only: bool,
-    max_cells: int = _MAX_GRID_CELLS,
-    reference: str = None,
-) -> list[dict]:
-    """
-    Return a deterministic, pruned, capped list of grid-cell hypothesis dicts.
+def _collect_groups_and_pairs(datasets: list, deg_datasets: dict, mappings: dict):
+    """Collect canonical groups and pairwise comparison pairs across raw + DEG data.
 
-    Each dict has the same shape as a seeder hypothesis, plus:
-      question_type, tool, tool_params
-
-    IDs are G1, G2, ... in stable priority order, identical across runs for
-    the same input data.
+    Returns (groups_sorted, pairs_sorted). Shared by build_coverage_grid (which builds
+    cells from these) and count_comparisons (which just needs the pair count).
     """
     mappings = mappings or {}
     deg_datasets = deg_datasets or {}
-
-    # ── Collect canonical groups and pairwise comparison pairs ─────────────
     groups: set[str] = set()
     pairs: set[tuple[str, str]] = set()
 
@@ -80,11 +80,40 @@ def build_coverage_grid(
             groups.add(b)
             pairs.add(_canonical_pair(a, b))
 
-    if not groups:
-        return []
+    return sorted(groups), sorted(pairs)
 
-    groups_sorted = sorted(groups)
-    pairs_sorted = sorted(pairs)
+
+def count_comparisons(datasets: list, deg_datasets: dict, mappings: dict) -> int:
+    """Number of distinct canonical group comparisons in the analysis space."""
+    _, pairs_sorted = _collect_groups_and_pairs(datasets, deg_datasets, mappings)
+    return len(pairs_sorted)
+
+
+def build_coverage_grid(
+    datasets: list,
+    deg_datasets: dict,
+    mappings: dict,
+    deg_only: bool,
+    max_cells: int = _MAX_GRID_CELLS,
+    reference: str = None,
+) -> list[dict]:
+    """
+    Return a deterministic, pruned, capped list of grid-cell hypothesis dicts.
+
+    Each dict has the same shape as a seeder hypothesis, plus:
+      question_type, tool, tool_params
+
+    IDs are G1, G2, ... in stable priority order, identical across runs for
+    the same input data.
+    """
+    mappings = mappings or {}
+    deg_datasets = deg_datasets or {}
+
+    # ── Collect canonical groups and pairwise comparison pairs ─────────────
+    groups_sorted, pairs_sorted = _collect_groups_and_pairs(datasets, deg_datasets, mappings)
+
+    if not groups_sorted:
+        return []
 
     raw: list[dict] = []  # list of cell descriptors before conversion
 
