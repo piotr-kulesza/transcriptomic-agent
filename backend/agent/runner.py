@@ -72,7 +72,7 @@ def _extract_first_json_object(s: str):
 
 from ..agent.system_prompt import build_system_prompt
 from ..agent.seeder import generate_seeds, extract_evidence_stats
-from ..agent.coverage import build_coverage_grid, K_OFF_GRID, _MAX_AUTO_RAISE
+from ..agent.coverage import build_coverage_grid, off_grid_headroom, count_comparisons, _MAX_AUTO_RAISE
 from ..agent.engine import characterize, build_layer1_summary
 from ..agent.orient import detect_reference_group, canonical_order
 from ..agent.memory import (
@@ -716,8 +716,12 @@ async def run_agent_loop(
     grid_hypotheses = build_coverage_grid(datasets, deg_datasets, mappings, _deg_only, reference=_reference_group)
     n_auto_gsea = sum(1 for s in seeds if s.get("seeded_by") == "auto_gsea")
     n_grid = len(grid_hypotheses)
+    # Off-grid exploration headroom scales with the analysis space (number of group
+    # comparisons), so near-empty grids don't demand a large exploration tail.
+    n_comparisons = count_comparisons(datasets, deg_datasets, mappings)
+    k_off_grid = off_grid_headroom(n_comparisons)
     # Auto-raise budget: floor + grid + off-grid headroom, capped at _MAX_AUTO_RAISE
-    min_budget = n_auto_gsea + n_grid + K_OFF_GRID
+    min_budget = n_auto_gsea + n_grid + k_off_grid
     orig_max = max_hypotheses
     max_hypotheses = min(max(max_hypotheses, min_budget), _MAX_AUTO_RAISE)
     max_steps = max_hypotheses * 5  # safety cap: generous budget per hypothesis
@@ -730,7 +734,7 @@ async def run_agent_loop(
     if max_hypotheses != orig_max:
         yield {"type": "seed", "text": (
             f"Budget auto-raised from {orig_max} to {max_hypotheses} "
-            f"({n_auto_gsea} floor + {n_grid} grid + {K_OFF_GRID} off-grid)."
+            f"({n_auto_gsea} floor + {n_grid} grid + {k_off_grid} off-grid)."
         ), "summary": ""}
     yield {"type": "seed", "text": "Layer 1: running characterization engine (deterministic)…", "summary": ""}
     engine_results = await loop.run_in_executor(
@@ -770,7 +774,7 @@ async def run_agent_loop(
     system_prompt = build_system_prompt(
         datasets, len(common_genes),
         seed_summary=seed_summary, deg_datasets=deg_datasets,
-        max_hypotheses=max_hypotheses, k_off_grid=K_OFF_GRID,
+        max_hypotheses=max_hypotheses, k_off_grid=k_off_grid,
         layer1_summary=layer1_summary,
         reference_group=_reference_group,
         prior_knowledge=prior_knowledge_text,
@@ -906,7 +910,7 @@ async def run_agent_loop(
 
         messages.append({"role": "user", "content": user_content})
 
-        yield {"type": "thinking", "text": f"Agent thinking... ({evaluated}/{max_hypotheses} hypotheses evaluated)"}
+        yield {"type": "thinking", "text": f"Agent thinking... ({evaluated}/{len(hypotheses)} hypotheses evaluated)"}
 
         # Apply prompt caching: clear all existing marks, then mark last 3 cacheable messages.
         # System prompt uses 1 of 4 allowed cache_control slots, leaving 3 for messages.
