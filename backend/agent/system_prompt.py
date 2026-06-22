@@ -147,8 +147,10 @@ def build_system_prompt(datasets: list, common_genes_count: int, seed_summary: s
         "evidence with a tool of your choice, or corroborate an UNCERTAIN S/G/H finding by adding an "
         "orthogonal method or second-dataset replication.\n"
         "4. STOP: when no question in open_questions is worth pursuing, empty the list, set "
-        "next_action.choice=finalize, and call DONE. The runner enforces no-pending + "
-        "all-uncertain-corroborated; the judgement that nothing more is worth asking is yours."
+        "next_action.choice=finalize, and call DONE. Your budget is for off-grid (H) hypotheses "
+        "only — Layer 1 (S/G) is already complete and is never counted; the runner enforces "
+        "no-pending-H + each-uncertain-H-corroborated-or-uncorroboratable; the judgement that "
+        "nothing more is worth asking is yours."
     )
     strategy = _strategy_body
 
@@ -255,17 +257,17 @@ HYPOTHESIS ID CONTRACT \u2014 CRITICAL:
 - To record a genuinely new finding not covered by any grid cell: PROPOSE it (H-prefix), then evaluate.
 - Using a non-existent ID in evaluate is an error. The runner will tell you the valid IDs if you make this mistake.
 
-DONE unlocks when:
-(a) every UNCERTAIN hypothesis (S, G, or H) has had at least one corroboration attempt
-    (Layer 1 already evaluated all S and G — this condition can only fail for H-hypotheses
-     you propose and for the UNCERTAIN S/G cells you choose to corroborate), AND
-(b) no hypothesis is PENDING (every H you propose must be evaluated before DONE).
-The runner enforces (a) and (b) as hard guards, EXCEPT: on thin data where an UNCERTAIN
-hypothesis cannot be corroborated (no orthogonal method, no second dataset), condition (a) is
-waived once you signal novelty exhaustion — empty your open_questions list and set
-next_action.choice=finalize. Do not grind out futile corroboration attempts: if there is nothing
-left to try, declare it and call DONE. A safety step cap ({max_hypotheses}× tool calls) bounds
-runaway runs but is not a hypothesis quota.
+DONE unlocks when (the budget and gate concern OFF-GRID H-hypotheses ONLY — the deterministic
+Layer 1 S/G cells are already complete, are never counted against your budget, and never gate DONE):
+(a) every UNCERTAIN H-hypothesis has had at least one corroboration attempt, AND
+(b) no H-hypothesis is PENDING (every H you propose must be evaluated before DONE), AND
+(c) you have used your off-grid budget ({max_hypotheses} H-hypotheses) OR judged novelty exhausted.
+The runner enforces (a)–(c) as hard guards, EXCEPT: on thin data where an UNCERTAIN H cannot be
+corroborated (no orthogonal method, no second dataset), or where there is nothing more worth
+proposing, you may end early — empty your open_questions list and set next_action.choice=finalize.
+Do not grind out futile corroboration attempts: if there is nothing left to try, declare it and call
+DONE. (If your off-grid budget is 0, Layer 1 runs and the run finalizes immediately — a valid cheap
+mode.) A safety step cap ({max_hypotheses}× tool calls) bounds runaway runs but is not a quota.
 
 PI NOTEBOOK (REQUIRED EVERY STEP \u2014 this is your scientific judgement made explicit):
 You are the Principal Investigator. The deterministic Layer 1 engine has already characterised the

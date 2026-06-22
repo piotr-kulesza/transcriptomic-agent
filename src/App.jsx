@@ -333,7 +333,7 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", fontSize: 12, color: t.textSecondary, padding: "4px 11px 4px 9px", border: `1px solid ${t.border}`, borderRadius: 99, background: t.surface2 }}>
             <span className={phase === "running" ? "blink" : ""} style={{ width: 7, height: 7, borderRadius: 99, background: phase === "running" ? t.accent : t.confirmed, flexShrink: 0 }} />
             {phase === "running"
-              ? <>Running · {hypotheses.filter(h => h.status !== "pending").length}/{hypotheses.length} hypotheses</>
+              ? <>Running · {hypotheses.filter(h => h.seeded_by === "llm" && h.status !== "pending").length}/{maxHypotheses} off-grid</>
               : <>Completed · {hypotheses.filter(h => ["confirmed", "uncertain", "rejected"].includes(h.status)).length} adjudicated</>}
           </div>
         )}
@@ -585,12 +585,14 @@ export default function App() {
               <option value="claude-haiku-4-5">Claude Haiku 4.5 — fast & cheap</option>
             </select>
 
-            <div className="sec">Minimum hypotheses</div>
-            <input type="number" value={maxHypotheses} min={1} max={30}
-              onChange={e => setMaxHypotheses(parseInt(e.target.value))}
+            <div className="sec">Off-grid hypotheses</div>
+            <input type="number" value={maxHypotheses} min={0} max={30}
+              onChange={e => setMaxHypotheses(Math.max(0, parseInt(e.target.value) || 0))}
               style={{ marginBottom: 6 }} />
             <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 14, lineHeight: 1.5 }}>
-              A floor, not a cap — the agent auto-raises this to fully cover the deterministic coverage grid plus off-grid exploration.
+              Budget for agent-proposed (off-grid) hypotheses. The deterministic Layer 1 — pairwise
+              comparisons and the coverage grid — always runs in full regardless and is not counted here.
+              Set to 0 for a Layer-1-only run.
             </div>
             </fieldset>
 
@@ -627,7 +629,7 @@ export default function App() {
                     streaming
                   </span>
                 )}
-                {hypotheses.length > 0 && <span style={{ fontSize: 12, color: t.textMuted }}>{hypotheses.filter(h => h.status !== "pending").length}/{hypotheses.length} evaluated</span>}
+                {hypotheses.length > 0 && <span style={{ fontSize: 12, color: t.textMuted }}>{hypotheses.filter(h => h.seeded_by === "llm" && h.status !== "pending").length}/{maxHypotheses} off-grid evaluated</span>}
               </div>
             </div>
           )}

@@ -736,31 +736,28 @@ async def run_agent_loop(
     n_auto_gsea = sum(1 for s in seeds if s.get("seeded_by") == "auto_gsea")
     n_grid = len(grid_hypotheses)
     # Off-grid exploration headroom scales with the analysis space (number of group
-    # comparisons), so near-empty grids don't demand a large exploration tail.
+    # comparisons); it informs the system prompt's suggested breadth only.
     n_comparisons = count_comparisons(datasets, deg_datasets, mappings)
     k_off_grid = off_grid_headroom(n_comparisons)
-    # Forced minimum budget is ONLY the deterministic coverage (floor + grid).
-    # Off-grid headroom is an exploration *allowance*, not a mandatory minimum: it
-    # may raise the default budget when the user under-specifies and it widens the
-    # cap the user is allowed to reach, but it must never push the budget above an
-    # explicit user choice that already covers floor+grid. So a 2-group/1-comparison
-    # dataset with user_max=2 and a near-empty grid stays at 2, not 3.
-    min_budget = n_auto_gsea + n_grid
-    orig_max = max_hypotheses
-    max_hypotheses = min(max(max_hypotheses, min_budget), _MAX_AUTO_RAISE)
-    max_steps = max_hypotheses * 5  # safety cap: generous budget per hypothesis
+    # Budget governs ONLY off-grid (LLM-proposed, seeded_by=="llm") H-hypotheses.
+    # The deterministic Layer 1 — auto_gsea floor seeds (S…) and coverage-grid cells
+    # (G…) — ALWAYS runs in full and is evaluated outside the budget: never counted
+    # against max_hypotheses, never shown in the live "X/Y" counter, and never a
+    # gate on DONE. Keep the user's choice exactly; clamp only the upper bound so a
+    # runaway off-grid budget can't exceed _MAX_AUTO_RAISE.
+    #   max_hypotheses == 0 → run Layer 1 only, then DONE immediately (cheap mode).
+    max_hypotheses = max(0, min(max_hypotheses, _MAX_AUTO_RAISE))
+    max_steps = max(1, max_hypotheses) * 5  # safety cap; ≥1 so a budget-0 run can still finalize
 
     # ── Layer 1: run characterization engine (deterministic, no LLM) ─────────
     hypotheses: list[dict] = list(seeds) + list(grid_hypotheses)  # S…, G…; H… appended during loop
     yield {"type": "mode", "mode": "reproduce" if temperature == 0.0 else "explore", "temperature": temperature}
     # Surface how many prior-run findings were recalled for this namespace's data.
     yield {"type": "prior_knowledge", "count": len(prior_entries)}
-    if max_hypotheses != orig_max:
-        yield {"type": "seed", "text": (
-            f"Budget auto-raised from {orig_max} to {max_hypotheses} "
-            f"to cover deterministic analysis ({n_auto_gsea} floor + {n_grid} grid). "
-            f"Off-grid exploration headroom (+{k_off_grid}) is an allowance, not a forced minimum."
-        ), "summary": ""}
+    yield {"type": "seed", "text": (
+        f"Budget: {max_hypotheses} off-grid hypotheses. Deterministic Layer 1 "
+        f"({n_auto_gsea} floor + {n_grid} grid) runs in full regardless and is not counted."
+    ), "summary": ""}
     yield {"type": "seed", "text": "Layer 1: running characterization engine (deterministic)…", "summary": ""}
     engine_results = await loop.run_in_executor(
         None, lambda: characterize(datasets, deg_datasets, mappings, _deg_only, hypotheses, reference=_reference_group)
@@ -824,6 +821,44 @@ async def run_agent_loop(
     _ONCE_ONLY = {"cross_dataset_de"}   # tools restricted to a single call per run
     _DEG_ONLY_ALLOWED = {"cross_dataset_de", "pathway_enrichment", "execute_code", "DONE"} | DEG_TOOL_NAMES
 
+    async def _finalize(conclusion_text: str, exhausted: bool = False):
+        """Persist cross-run knowledge and write the run report, yielding done+report."""
+        done_event = {"type": "done", "text": conclusion_text}
+        if exhausted:
+            done_event["exhausted"] = True
+        yield done_event
+        run_meta = {
+            "run_id": run_id,
+            "user_id": user_id,
+            "project_id": project_id,
+            "datasets": [ds["name"] for ds in datasets] + sorted(deg_datasets.keys()),
+            "groups": sorted({g for ds in datasets for g in ds.get("groups", [])}),
+            "model": model,
+        }
+        new_claims = extract_claims_from_hypotheses(hypotheses, direction_claims_by_hid)
+        contradictions: list[dict] = []
+        try:
+            contradictions = await loop.run_in_executor(
+                None, memory_store.merge, user_id, project_id, new_claims, run_meta,
+            )
+        except Exception as e:
+            logger.error("Failed to persist knowledge for user=%s project=%s: %s", user_id, project_id, e)
+        report_path = await loop.run_in_executor(
+            None, _write_report, datasets, seed_summary, seed_data, report_steps, hypotheses, conclusion_text,
+            prior_entries, contradictions, reports_dir,
+        )
+        yield {"type": "report", "path": report_path}
+
+    # Budget 0 → Layer 1 only. Deterministic characterization is already complete
+    # above; there is no off-grid work to do, so finalize immediately (no LLM calls).
+    if max_hypotheses == 0:
+        async for _ev in _finalize(
+            "Layer-1-only run (off-grid budget = 0): deterministic characterization "
+            "complete. See pre-analysis tables and S/G hypotheses for results."
+        ):
+            yield _ev
+        return
+
     for i in range(max_steps):
         step_num = i + 1
         is_last = step_num == max_steps
@@ -865,19 +900,17 @@ async def run_agent_loop(
             "Discoveries:\n" + "\n".join(f"- [{d['action']}] {d['summary']}" for d in discoveries[-8:])
             if discoveries else "First step."
         )
-        # Build hypothesis display: show all PENDING in full; condensed for evaluated
-        _pending_h = [h for h in hypotheses if h["status"] == "pending"]
+        # Build hypothesis display: actionable PENDING = off-grid H only (deterministic
+        # Layer 1 S/G are evaluated outside the budget and never need agent resolution;
+        # their verdicts live in the LAYER 1 SUMMARY). Evaluated shown condensed for context.
+        _pending_h = [h for h in hypotheses if h["status"] == "pending" and h.get("seeded_by") == "llm"]
         _eval_h    = [h for h in hypotheses if h["status"] != "pending"]
         hypo_lines = []
         for h in _pending_h:
             ev = len(h.get("evidence", []))
             short = h["text"][:80] + ("…" if len(h["text"]) > 80 else "")
             ev_tag = f", {ev}ev" if ev else ""
-            if h.get("seeded_by") == "grid":
-                qt_tag = f" [grid:{h.get('question_type','?')}→{h.get('tool','?')}]"
-            else:
-                qt_tag = ""
-            hypo_lines.append(f"  {h['id']} [PENDING{ev_tag}]{qt_tag}: {short}")
+            hypo_lines.append(f"  {h['id']} [PENDING{ev_tag}]: {short}")
         # Show last 12 evaluated in condensed form to limit context
         _show_eval = _eval_h[-12:]
         if len(_eval_h) > 12:
@@ -892,54 +925,65 @@ async def run_agent_loop(
         )
 
         summary_block = f"{notebook_block}\n{discovery_summary}{hypo_summary}"
-        evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
-        _no_pending = not any(h["status"] == "pending" for h in hypotheses)
-        _uncertain_now = {h["id"] for h in hypotheses if h["status"] == "uncertain"}
+        # Counter + gate count ONLY off-grid (LLM-proposed) H-hypotheses. The
+        # deterministic Layer 1 (S/G) is complete and outside the budget; it never
+        # appears in the "X/Y" counter and never gates DONE.
+        _offgrid = [h for h in hypotheses if h.get("seeded_by") == "llm"]
+        _off_grid_n = len(_offgrid)
+        evaluated = sum(1 for h in _offgrid if h["status"] != "pending")
+        _no_pending = not any(h["status"] == "pending" for h in _offgrid)
+        _uncertain_now = {h["id"] for h in _offgrid if h["status"] == "uncertain"}
         _all_corroborated = _uncertain_now.issubset(post_grid_evidence)
         _novelty_exhausted = _pi_novelty_exhausted(pi_notebook)
+        _budget_reached = _off_grid_n >= max_hypotheses
 
         # ── Factual ledger — no cell-march, no directives. The AI is the PI. ──
-        _pending_ids = [h["id"] for h in hypotheses if h["status"] == "pending"]
+        _pending_ids = [h["id"] for h in _offgrid if h["status"] == "pending"]
         _uncorroborated = sorted(_uncertain_now - post_grid_evidence)
-        _off_grid_n = sum(1 for h in hypotheses if h.get("seeded_by") == "llm")
         ledger_lines = [
-            f"Layer 1: {n_grid}/{n_grid} grid cells + {n_auto_gsea} floor seeds pre-evaluated. "
-            f"Off-grid H-proposals so far: {_off_grid_n}."
+            f"Layer 1 (deterministic, outside budget): {n_grid}/{n_grid} grid cells + "
+            f"{n_auto_gsea} floor seeds pre-evaluated. "
+            f"Off-grid H-hypotheses: {evaluated}/{max_hypotheses} evaluated ({_off_grid_n} proposed)."
         ]
         if _pending_ids:
-            ledger_lines.append(f"PENDING (must resolve before DONE): {_pending_ids}.")
+            ledger_lines.append(f"PENDING H (must resolve before DONE): {_pending_ids}.")
         if _uncorroborated and not _novelty_exhausted:
             ledger_lines.append(
-                f"UNCERTAIN needing corroboration before DONE: {_uncorroborated} — "
+                f"UNCERTAIN H needing corroboration before DONE: {_uncorroborated} — "
                 f"one new evidence item suffices (orthogonal method or second dataset). "
                 f"If no such method or dataset exists (thin data), clear open_questions and set "
                 f"next_action.choice=finalize to end the run."
+            )
+        if not _budget_reached and not _novelty_exhausted:
+            ledger_lines.append(
+                f"Off-grid budget not yet used ({_off_grid_n}/{max_hypotheses}). Propose and test "
+                f"more H-hypotheses, or set next_action.choice=finalize if nothing is worth pursuing."
             )
         if is_last:
             gate_state = (
                 "FINAL STEP — safety step limit reached. Resolve any pendings as uncertain "
                 "if needed and call DONE."
             )
-        elif _no_pending and (_all_corroborated or _novelty_exhausted):
+        elif _no_pending and (_all_corroborated or _novelty_exhausted) and (_budget_reached or _novelty_exhausted):
             gate_state = (
-                "DONE permitted now: floor+grid done, no pending, and uncertain hypotheses "
-                "either corroborated or nothing left to try. Write the final synthesis as your "
-                "thought, set next_action.choice=finalize, and choose action=DONE."
+                "DONE permitted now: no pending H, uncertain H either corroborated or nothing left "
+                "to try, and off-grid budget reached (or novelty exhausted). Write the final "
+                "synthesis as your thought, set next_action.choice=finalize, and choose action=DONE."
             )
         else:
             gate_state = (
-                "DONE NOT YET permitted — address the items above. You decide which open question "
+                "DONE NOT YET permitted — address the items above. You decide which off-grid question "
                 "to pursue next; the runner imposes no order. If you have nothing left to try, "
                 "clear open_questions and set next_action.choice=finalize to unblock DONE."
             )
         user_content = (
-            f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. "
+            f"Step {step_num} [{evaluated}/{max_hypotheses} off-grid hypotheses evaluated]. "
             f"{summary_block}\n\n" + "\n".join(ledger_lines) + f"\n\n{gate_state}"
         )
 
         messages.append({"role": "user", "content": user_content})
 
-        yield {"type": "thinking", "text": f"Agent thinking... ({evaluated}/{len(hypotheses)} hypotheses evaluated)"}
+        yield {"type": "thinking", "text": f"Agent thinking... ({evaluated}/{max_hypotheses} off-grid hypotheses evaluated)"}
 
         # Apply prompt caching: clear all existing marks, then mark last 3 cacheable messages.
         # System prompt uses 1 of 4 allowed cache_control slots, leaving 3 for messages.
@@ -1070,45 +1114,40 @@ async def run_agent_loop(
         loop = asyncio.get_event_loop()
 
         if action == "DONE":
-            # Layer 1 evaluated all S+G up front, so floor_done is True from step 1.
-            # The PI (AI) decides when novelty is exhausted — the runner only enforces:
-            #   (1) no PENDING hypothesis, (2) every UNCERTAIN has had a corroboration
-            #       attempt OR the PI has signalled there is nothing left to try.
-            # A corroboration *attempt* counts even when it yields no orthogonal
-            # evidence (post_grid_evidence is set on any post-grid evaluation of the
-            # hypothesis). On thin data (single dataset, no orthogonal method) an
-            # UNCERTAIN may be uncorroboratable; the novelty-exhausted escape lets the
-            # PI end the run promptly instead of grinding to the safety step cap.
-            floor_and_grid = [h for h in hypotheses if h.get("seeded_by") in ("auto_gsea", "grid")]
-            floor_done = all(h["status"] != "pending" for h in floor_and_grid)
-            no_pending = not any(h["status"] == "pending" for h in hypotheses)
-            uncertain_at_done = {h["id"] for h in hypotheses if h["status"] == "uncertain"}
+            # Layer 1 (S/G) always ran deterministically up front and is OUTSIDE the
+            # budget — it never gates DONE. The runner only enforces, on off-grid H:
+            #   (1) no PENDING H,
+            #   (2) every UNCERTAIN H has had a corroboration attempt OR the PI has
+            #       signalled nothing is left to try (uncorroboratable on thin data),
+            #   (3) the off-grid budget is used up OR novelty is exhausted.
+            # A corroboration *attempt* counts even with no orthogonal evidence
+            # (post_grid_evidence is set on any post-grid evaluation of the hypothesis).
+            offgrid = [h for h in hypotheses if h.get("seeded_by") == "llm"]
+            no_pending = not any(h["status"] == "pending" for h in offgrid)
+            uncertain_at_done = {h["id"] for h in offgrid if h["status"] == "uncertain"}
             all_corroborated = uncertain_at_done.issubset(post_grid_evidence)
             novelty_exhausted = _pi_novelty_exhausted(pi_notebook)
+            budget_reached = len(offgrid) >= max_hypotheses
             can_done = is_last or (
-                floor_done and no_pending and (all_corroborated or novelty_exhausted)
+                no_pending
+                and (all_corroborated or novelty_exhausted)
+                and (budget_reached or novelty_exhausted)
             )
             if not can_done:
-                pending_all = [h["id"] for h in hypotheses if h["status"] == "pending"]
+                pending_all = [h["id"] for h in offgrid if h["status"] == "pending"]
                 logger.warning(
-                    "DONE blocked at step %d: floor_done=%s no_pending=%s all_corroborated=%s novelty_exhausted=%s",
-                    step_num, floor_done, no_pending, all_corroborated, novelty_exhausted,
+                    "DONE blocked at step %d: no_pending=%s all_corroborated=%s novelty_exhausted=%s budget=%d/%d",
+                    step_num, no_pending, all_corroborated, novelty_exhausted, len(offgrid), max_hypotheses,
                 )
-                if not floor_done:
-                    pending_engine = [h["id"] for h in floor_and_grid if h["status"] == "pending"]
+                if not no_pending:
                     detail = (
-                        f"Floor/grid cells still pending: {pending_engine}. "
-                        f"(Layer 1 should have evaluated these — investigate.)"
-                    )
-                elif not no_pending:
-                    detail = (
-                        f"H-hypotheses still PENDING (never evaluated): {pending_all}. "
+                        f"Off-grid H-hypotheses still PENDING (never evaluated): {pending_all}. "
                         f"Gather evidence and evaluate each before calling DONE."
                     )
-                else:
+                elif not (all_corroborated or novelty_exhausted):
                     uncorroborated = sorted(uncertain_at_done - post_grid_evidence)
                     detail = (
-                        f"Corroboration required for UNCERTAIN hypotheses: {uncorroborated}. "
+                        f"Corroboration required for UNCERTAIN H-hypotheses: {uncorroborated}. "
                         f"Gather at least one new evidence item for each (orthogonal method or "
                         f"second dataset). The hypothesis may stay UNCERTAIN — the attempt itself "
                         f"unblocks DONE. If no orthogonal method or second dataset exists to "
@@ -1116,34 +1155,19 @@ async def run_agent_loop(
                         f"next_action.choice=finalize, then call DONE — an impossible corroboration "
                         f"must not be required."
                     )
+                else:
+                    detail = (
+                        f"Off-grid budget not yet used ({len(offgrid)}/{max_hypotheses}). Propose and "
+                        f"test more H-hypotheses, or — if nothing more is worth pursuing — clear your "
+                        f"open_questions and set next_action.choice=finalize, then call DONE."
+                    )
                 report_steps.append({"step": step_num, "thought": thought, "action": "DONE", "params": {},
                                      "blocked": f"DONE blocked: {detail}"})
                 messages.append({"role": "assistant", "content": raw})
                 messages.append({"role": "user", "content": f"ERROR: Cannot call DONE yet. {detail}"})
                 continue
-            yield {"type": "done", "text": thought}
-            # Persist to cross-run knowledge store and collect any direction-flip contradictions
-            run_meta = {
-                "run_id": run_id,
-                "user_id": user_id,
-                "project_id": project_id,
-                "datasets": [ds["name"] for ds in datasets] + sorted(deg_datasets.keys()),
-                "groups": sorted({g for ds in datasets for g in ds.get("groups", [])}),
-                "model": model,
-            }
-            new_claims = extract_claims_from_hypotheses(hypotheses, direction_claims_by_hid)
-            contradictions: list[dict] = []
-            try:
-                contradictions = await loop.run_in_executor(
-                    None, memory_store.merge, user_id, project_id, new_claims, run_meta,
-                )
-            except Exception as e:
-                logger.error("Failed to persist knowledge for user=%s project=%s: %s", user_id, project_id, e)
-            report_path = await loop.run_in_executor(
-                None, _write_report, datasets, seed_summary, seed_data, report_steps, hypotheses, thought,
-                prior_entries, contradictions, reports_dir,
-            )
-            yield {"type": "report", "path": report_path}
+            async for _ev in _finalize(thought):
+                yield _ev
             return
 
         # Guard: model sometimes puts "hypothesis_action" in the action field by mistake
@@ -1372,27 +1396,10 @@ async def run_agent_loop(
         messages.append({"role": "user", "content": user_result_msg})
 
     # Loop exhausted without DONE — write report with what we have
-    evaluated = sum(1 for h in hypotheses if h["status"] != "pending")
-    done_text = f"Safety step limit reached ({max_steps} steps). {evaluated}/{max_hypotheses} hypotheses evaluated."
-    yield {"type": "done", "text": done_text, "exhausted": True}
-    run_meta = {
-        "run_id": run_id,
-        "user_id": user_id,
-        "project_id": project_id,
-        "datasets": [ds["name"] for ds in datasets] + sorted(deg_datasets.keys()),
-        "groups": sorted({g for ds in datasets for g in ds.get("groups", [])}),
-        "model": model,
-    }
-    new_claims = extract_claims_from_hypotheses(hypotheses, direction_claims_by_hid)
-    contradictions: list[dict] = []
-    try:
-        contradictions = await loop.run_in_executor(
-            None, memory_store.merge, user_id, project_id, new_claims, run_meta,
-        )
-    except Exception as e:
-        logger.error("Failed to persist knowledge for user=%s project=%s: %s", user_id, project_id, e)
-    report_path = await loop.run_in_executor(
-        None, _write_report, datasets, seed_summary, seed_data, report_steps, hypotheses, done_text,
-        prior_entries, contradictions, reports_dir,
+    _evaluated_offgrid = sum(1 for h in hypotheses if h.get("seeded_by") == "llm" and h["status"] != "pending")
+    done_text = (
+        f"Safety step limit reached ({max_steps} steps). "
+        f"{_evaluated_offgrid}/{max_hypotheses} off-grid hypotheses evaluated."
     )
-    yield {"type": "report", "path": report_path}
+    async for _ev in _finalize(done_text, exhausted=True):
+        yield _ev
