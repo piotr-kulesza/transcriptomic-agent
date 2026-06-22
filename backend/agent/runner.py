@@ -618,6 +618,25 @@ def _check_direction_consistency(hypothesis: dict, direction_claims: list) -> li
     return issues
 
 
+def _pi_novelty_exhausted(pi_notebook: dict | None) -> bool:
+    """True when the PI has signalled it has nothing left to try.
+
+    Used to unblock DONE on thin data where an UNCERTAIN hypothesis cannot be
+    corroborated (no orthogonal method, no second dataset). The signal is explicit
+    and PI-driven: either next_action.choice == "finalize", or the open_questions
+    list has been emptied. A first step with no notebook yet never counts.
+    """
+    if not isinstance(pi_notebook, dict):
+        return False
+    na = pi_notebook.get("next_action") or {}
+    choice = (na.get("choice") if isinstance(na, dict) else "") or ""
+    if choice.strip().lower() == "finalize":
+        return True
+    open_qs = pi_notebook.get("open_questions")
+    # An explicitly emptied open_questions list means the PI sees nothing worth pursuing.
+    return isinstance(open_qs, list) and len(open_qs) == 0
+
+
 async def run_agent_loop(
     datasets: list,
     max_hypotheses: int,
@@ -720,8 +739,13 @@ async def run_agent_loop(
     # comparisons), so near-empty grids don't demand a large exploration tail.
     n_comparisons = count_comparisons(datasets, deg_datasets, mappings)
     k_off_grid = off_grid_headroom(n_comparisons)
-    # Auto-raise budget: floor + grid + off-grid headroom, capped at _MAX_AUTO_RAISE
-    min_budget = n_auto_gsea + n_grid + k_off_grid
+    # Forced minimum budget is ONLY the deterministic coverage (floor + grid).
+    # Off-grid headroom is an exploration *allowance*, not a mandatory minimum: it
+    # may raise the default budget when the user under-specifies and it widens the
+    # cap the user is allowed to reach, but it must never push the budget above an
+    # explicit user choice that already covers floor+grid. So a 2-group/1-comparison
+    # dataset with user_max=2 and a near-empty grid stays at 2, not 3.
+    min_budget = n_auto_gsea + n_grid
     orig_max = max_hypotheses
     max_hypotheses = min(max(max_hypotheses, min_budget), _MAX_AUTO_RAISE)
     max_steps = max_hypotheses * 5  # safety cap: generous budget per hypothesis
@@ -734,7 +758,8 @@ async def run_agent_loop(
     if max_hypotheses != orig_max:
         yield {"type": "seed", "text": (
             f"Budget auto-raised from {orig_max} to {max_hypotheses} "
-            f"({n_auto_gsea} floor + {n_grid} grid + {k_off_grid} off-grid)."
+            f"to cover deterministic analysis ({n_auto_gsea} floor + {n_grid} grid). "
+            f"Off-grid exploration headroom (+{k_off_grid}) is an allowance, not a forced minimum."
         ), "summary": ""}
     yield {"type": "seed", "text": "Layer 1: running characterization engine (deterministic)…", "summary": ""}
     engine_results = await loop.run_in_executor(
@@ -871,6 +896,7 @@ async def run_agent_loop(
         _no_pending = not any(h["status"] == "pending" for h in hypotheses)
         _uncertain_now = {h["id"] for h in hypotheses if h["status"] == "uncertain"}
         _all_corroborated = _uncertain_now.issubset(post_grid_evidence)
+        _novelty_exhausted = _pi_novelty_exhausted(pi_notebook)
 
         # ── Factual ledger — no cell-march, no directives. The AI is the PI. ──
         _pending_ids = [h["id"] for h in hypotheses if h["status"] == "pending"]
@@ -882,26 +908,29 @@ async def run_agent_loop(
         ]
         if _pending_ids:
             ledger_lines.append(f"PENDING (must resolve before DONE): {_pending_ids}.")
-        if _uncorroborated:
+        if _uncorroborated and not _novelty_exhausted:
             ledger_lines.append(
                 f"UNCERTAIN needing corroboration before DONE: {_uncorroborated} — "
-                f"one new evidence item suffices (orthogonal method or second dataset)."
+                f"one new evidence item suffices (orthogonal method or second dataset). "
+                f"If no such method or dataset exists (thin data), clear open_questions and set "
+                f"next_action.choice=finalize to end the run."
             )
         if is_last:
             gate_state = (
                 "FINAL STEP — safety step limit reached. Resolve any pendings as uncertain "
                 "if needed and call DONE."
             )
-        elif _no_pending and _all_corroborated:
+        elif _no_pending and (_all_corroborated or _novelty_exhausted):
             gate_state = (
-                "DONE permitted now: floor+grid done, no pending, all uncertain corroborated. "
-                "If no open_questions remain worth pursuing, write the final synthesis as your "
+                "DONE permitted now: floor+grid done, no pending, and uncertain hypotheses "
+                "either corroborated or nothing left to try. Write the final synthesis as your "
                 "thought, set next_action.choice=finalize, and choose action=DONE."
             )
         else:
             gate_state = (
                 "DONE NOT YET permitted — address the items above. You decide which open question "
-                "to pursue next; the runner imposes no order."
+                "to pursue next; the runner imposes no order. If you have nothing left to try, "
+                "clear open_questions and set next_action.choice=finalize to unblock DONE."
             )
         user_content = (
             f"Step {step_num} [{evaluated}/{max_hypotheses} hypotheses evaluated]. "
@@ -1043,18 +1072,27 @@ async def run_agent_loop(
         if action == "DONE":
             # Layer 1 evaluated all S+G up front, so floor_done is True from step 1.
             # The PI (AI) decides when novelty is exhausted — the runner only enforces:
-            #   (1) no PENDING hypothesis, (2) every UNCERTAIN has had a corroboration attempt.
+            #   (1) no PENDING hypothesis, (2) every UNCERTAIN has had a corroboration
+            #       attempt OR the PI has signalled there is nothing left to try.
+            # A corroboration *attempt* counts even when it yields no orthogonal
+            # evidence (post_grid_evidence is set on any post-grid evaluation of the
+            # hypothesis). On thin data (single dataset, no orthogonal method) an
+            # UNCERTAIN may be uncorroboratable; the novelty-exhausted escape lets the
+            # PI end the run promptly instead of grinding to the safety step cap.
             floor_and_grid = [h for h in hypotheses if h.get("seeded_by") in ("auto_gsea", "grid")]
             floor_done = all(h["status"] != "pending" for h in floor_and_grid)
             no_pending = not any(h["status"] == "pending" for h in hypotheses)
             uncertain_at_done = {h["id"] for h in hypotheses if h["status"] == "uncertain"}
             all_corroborated = uncertain_at_done.issubset(post_grid_evidence)
-            can_done = is_last or (floor_done and no_pending and all_corroborated)
+            novelty_exhausted = _pi_novelty_exhausted(pi_notebook)
+            can_done = is_last or (
+                floor_done and no_pending and (all_corroborated or novelty_exhausted)
+            )
             if not can_done:
                 pending_all = [h["id"] for h in hypotheses if h["status"] == "pending"]
                 logger.warning(
-                    "DONE blocked at step %d: floor_done=%s no_pending=%s all_corroborated=%s",
-                    step_num, floor_done, no_pending, all_corroborated,
+                    "DONE blocked at step %d: floor_done=%s no_pending=%s all_corroborated=%s novelty_exhausted=%s",
+                    step_num, floor_done, no_pending, all_corroborated, novelty_exhausted,
                 )
                 if not floor_done:
                     pending_engine = [h["id"] for h in floor_and_grid if h["status"] == "pending"]
@@ -1073,7 +1111,10 @@ async def run_agent_loop(
                         f"Corroboration required for UNCERTAIN hypotheses: {uncorroborated}. "
                         f"Gather at least one new evidence item for each (orthogonal method or "
                         f"second dataset). The hypothesis may stay UNCERTAIN — the attempt itself "
-                        f"unblocks DONE."
+                        f"unblocks DONE. If no orthogonal method or second dataset exists to "
+                        f"corroborate these (thin data), say so: clear your open_questions and set "
+                        f"next_action.choice=finalize, then call DONE — an impossible corroboration "
+                        f"must not be required."
                     )
                 report_steps.append({"step": step_num, "thought": thought, "action": "DONE", "params": {},
                                      "blocked": f"DONE blocked: {detail}"})

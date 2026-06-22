@@ -259,11 +259,13 @@ DONE unlocks when:
 (a) every UNCERTAIN hypothesis (S, G, or H) has had at least one corroboration attempt
     (Layer 1 already evaluated all S and G — this condition can only fail for H-hypotheses
      you propose and for the UNCERTAIN S/G cells you choose to corroborate), AND
-(b) no hypothesis is PENDING (every H you propose must be evaluated before DONE), AND
-(c) your open_questions list is empty — i.e. you judge novelty exhausted.
-The runner enforces (a) and (b) as hard guards. Condition (c) is your call as the PI; state it
-in your notebook (empty open_questions list + next_action.choice=finalize). A safety step cap
-({max_hypotheses}× tool calls) bounds runaway runs but is not a hypothesis quota.
+(b) no hypothesis is PENDING (every H you propose must be evaluated before DONE).
+The runner enforces (a) and (b) as hard guards, EXCEPT: on thin data where an UNCERTAIN
+hypothesis cannot be corroborated (no orthogonal method, no second dataset), condition (a) is
+waived once you signal novelty exhaustion — empty your open_questions list and set
+next_action.choice=finalize. Do not grind out futile corroboration attempts: if there is nothing
+left to try, declare it and call DONE. A safety step cap ({max_hypotheses}× tool calls) bounds
+runaway runs but is not a hypothesis quota.
 
 PI NOTEBOOK (REQUIRED EVERY STEP \u2014 this is your scientific judgement made explicit):
 You are the Principal Investigator. The deterministic Layer 1 engine has already characterised the
